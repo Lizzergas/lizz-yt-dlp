@@ -3,6 +3,7 @@ package dev.lizz.ytdl.sample.compose
 import dev.lizz.ytdl.core.DownloadEvent
 import dev.lizz.ytdl.core.DownloadRequest
 import dev.lizz.ytdl.core.DownloadResult
+import dev.lizz.ytdl.core.TranscriptResult
 import dev.lizz.ytdl.core.YoutubeDownloader
 import dev.lizz.ytdl.engine.youtube.IosNativeYoutubeDownloaderFactory
 
@@ -21,5 +22,13 @@ private class IosSampleDownloader(
         emit: suspend (DownloadEvent) -> Unit,
     ): DownloadResult {
         return delegate.download(request, emit)
+    }
+
+    override suspend fun getTranscript(url: String, includeTimecodes: Boolean): String? {
+        return delegate.getTranscript(url, includeTimecodes)
+    }
+
+    override suspend fun getTranscriptCues(url: String): TranscriptResult? {
+        return delegate.getTranscriptCues(url)
     }
 }

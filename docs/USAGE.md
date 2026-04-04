@@ -108,6 +108,45 @@ val result = downloader.download(request) { event ->
 }
 ```
 
+## Transcript API
+
+If English subtitles or automatic captions exist, you can retrieve them as plain text or as structured cues.
+
+Plain text:
+
+```kotlin
+val transcript = downloader.getTranscript(
+    url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    includeTimecodes = false,
+)
+```
+
+Plain text with inline timecodes:
+
+```kotlin
+val transcriptWithTimecodes = downloader.getTranscript(
+    url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    includeTimecodes = true,
+)
+```
+
+Structured cues:
+
+```kotlin
+val transcriptResult = downloader.getTranscriptCues("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+transcriptResult?.cues?.forEach { cue ->
+    println("${cue.startMs} -> ${cue.endMs}: ${cue.text}")
+}
+```
+
+Behavior:
+
+- English only
+- manual subtitles are preferred over automatic captions
+- returns `null` when no English subtitles or captions are available
+- plain transcript mode removes WebVTT timing and de-duplicates adjacent identical cues
+
 ## Output Path Rules
 
 `DownloadOptions.outputPath` accepts either a directory or a file path.

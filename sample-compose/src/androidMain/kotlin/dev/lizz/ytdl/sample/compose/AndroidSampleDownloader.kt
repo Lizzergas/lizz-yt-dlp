@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import dev.lizz.ytdl.core.DownloadEvent
 import dev.lizz.ytdl.core.DownloadRequest
 import dev.lizz.ytdl.core.DownloadResult
+import dev.lizz.ytdl.core.TranscriptResult
 import dev.lizz.ytdl.core.YoutubeDownloader
 import dev.lizz.ytdl.engine.youtube.AndroidNativeYoutubeDownloaderFactory
 import io.github.vinceglb.filekit.FileKit
@@ -63,6 +64,14 @@ private class AndroidSampleDownloader(
     ): DownloadResult {
         return delegate.download(request, emit)
     }
+
+    override suspend fun getTranscript(url: String, includeTimecodes: Boolean): String? {
+        return delegate.getTranscript(url, includeTimecodes)
+    }
+
+    override suspend fun getTranscriptCues(url: String): TranscriptResult? {
+        return delegate.getTranscriptCues(url)
+    }
 }
 
 private class UnsupportedAndroidSampleDownloader : SampleDownloader {
@@ -73,6 +82,14 @@ private class UnsupportedAndroidSampleDownloader : SampleDownloader {
         request: DownloadRequest,
         emit: suspend (DownloadEvent) -> Unit,
     ): DownloadResult {
+        throw UnsupportedOperationException("Android sample downloader has not been initialized with an Android Context")
+    }
+
+    override suspend fun getTranscript(url: String, includeTimecodes: Boolean): String? {
+        throw UnsupportedOperationException("Android sample downloader has not been initialized with an Android Context")
+    }
+
+    override suspend fun getTranscriptCues(url: String): TranscriptResult? {
         throw UnsupportedOperationException("Android sample downloader has not been initialized with an Android Context")
     }
 }

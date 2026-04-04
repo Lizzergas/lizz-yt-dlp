@@ -5,6 +5,7 @@ import androidx.compose.ui.window.application
 import dev.lizz.ytdl.core.DownloadEvent
 import dev.lizz.ytdl.core.DownloadRequest
 import dev.lizz.ytdl.core.DownloadResult
+import dev.lizz.ytdl.core.TranscriptResult
 import dev.lizz.ytdl.engine.youtube.JvmNativeYoutubeDownloaderFactory
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -36,6 +37,14 @@ private class DesktopSampleDownloader : SampleDownloader {
         request: DownloadRequest,
         emit: suspend (DownloadEvent) -> Unit,
     ): DownloadResult = delegate.download(request, emit)
+
+    override suspend fun getTranscript(url: String, includeTimecodes: Boolean): String? {
+        return delegate.getTranscript(url, includeTimecodes)
+    }
+
+    override suspend fun getTranscriptCues(url: String): TranscriptResult? {
+        return delegate.getTranscriptCues(url)
+    }
 }
 
 fun main() = application {

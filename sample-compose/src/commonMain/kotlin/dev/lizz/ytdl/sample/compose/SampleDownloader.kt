@@ -4,6 +4,7 @@ import dev.lizz.ytdl.core.DownloadEvent
 import dev.lizz.ytdl.core.DownloadOptions
 import dev.lizz.ytdl.core.DownloadRequest
 import dev.lizz.ytdl.core.DownloadResult
+import dev.lizz.ytdl.core.TranscriptResult
 import io.github.vinceglb.filekit.PlatformFile
 
 interface SampleDownloader {
@@ -14,6 +15,10 @@ interface SampleDownloader {
         request: DownloadRequest,
         emit: suspend (DownloadEvent) -> Unit = {},
     ): DownloadResult
+
+    suspend fun getTranscript(url: String, includeTimecodes: Boolean = false): String?
+
+    suspend fun getTranscriptCues(url: String): TranscriptResult?
 }
 
 expect fun createSampleDownloader(): SampleDownloader
