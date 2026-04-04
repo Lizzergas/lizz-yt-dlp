@@ -12,8 +12,8 @@ repositories {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("dev.lizz.ytdl:youtube-downloader-core:0.1.0-alpha01")
-            implementation("dev.lizz.ytdl:youtube-downloader-engine-youtube:0.1.0-alpha01")
+            implementation("dev.lizz.ytdl:youtube-downloader-core:0.1.0-alpha02")
+            implementation("dev.lizz.ytdl:youtube-downloader-engine-youtube:0.1.0-alpha02")
         }
     }
 }
