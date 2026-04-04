@@ -6,6 +6,7 @@ Files:
 
 - `architecture.md`: module map and runtime flow
 - `android-native-media.md`: Android LAME bridge notes
+- `USAGE.md`: consumer setup and library usage examples
 - `RELEASE_CHECKLIST.md`: release process for Maven Central publishing
 
 Start with `architecture.md` for the current shape of the repository.
