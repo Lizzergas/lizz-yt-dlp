@@ -96,11 +96,18 @@ Implemented in `AndroidMp3Transcoder.kt`.
 
 ### HLS manifest path
 
-1. `MediaExtractor.setDataSource(manifestUrl, headers)`
-2. same decode-to-PCM path as above
-3. same JNI LAME encode path as above
+The original remote-manifest approach proved unreliable on Android for some YouTube URLs.
 
-This is important because it means Android does not need a second media path for manifest downloads. The transcoder owns both decoding and MP3 encoding.
+Current path:
+
+1. fetch HLS master manifest
+2. parse `#EXT-X-MEDIA` entries and choose an audio playlist
+3. fetch the selected audio playlist
+4. download its media segments locally into a temp media file
+5. run the normal local-file decode-to-PCM path against that temp file
+6. same JNI LAME encode path as above
+
+This is much closer to a fragment downloader like `yt-dlp` and is more robust than asking Android `MediaExtractor` to open some remote YouTube HLS playlists directly.
 
 ## 16 KB Page Size Compatibility
 
@@ -146,13 +153,14 @@ This is workable for a prototype but should be hardened.
 
 ### 2. Manifest handling
 
-`MediaExtractor.setDataSource(manifestUrl, headers)` may behave differently across:
+The direct remote-manifest path is no longer the main Android strategy because it proved unreliable.
 
-- Android versions
-- device vendors
-- network stacks
+The current Android risks are now:
 
-That path needs real device validation.
+- local HLS playlist parsing robustness
+- segment download correctness
+- local fragment concatenation assumptions
+- final local temp-file decodability across devices/vendors
 
 ### 3. LAME warnings
 
@@ -183,3 +191,4 @@ We explicitly rejected FFmpegKit because:
 4. add instrumentation-level transcoder tests
 5. make output integrity checks explicit
 6. eventually replace ad-hoc JNI API with a more formal transcoder abstraction in shared code
+7. add tests specifically for the local HLS fragment downloader path

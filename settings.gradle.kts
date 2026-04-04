@@ -26,4 +26,5 @@ include(
     ":sample-cli",
     ":sample-compose",
     ":androidApp",
+    ":iosApp",
 )

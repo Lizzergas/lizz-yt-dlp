@@ -60,6 +60,8 @@ That means selection logic cannot stop at “has a URL”. It must include:
 - retry strategy
 - fallback ordering
 
+It also means platform-specific runtime behavior matters. In this project, Android ultimately needed a downloader-style local HLS fragment path rather than relying on the platform media stack to open remote HLS playlists directly.
+
 ### 4. Partial deciphering is useful but not enough
 
 The current player-JS decipherers are intentionally minimal.
@@ -89,6 +91,18 @@ The current Android solution is better strategically because it:
 - owns the LAME bridge
 - avoids relying on abandoned wrappers
 
+An additional Android lesson came later:
+
+- some HLS playback problems are actually downloader problems
+
+The working Android strategy became:
+
+1. parse HLS master manifest
+2. select audio playlist
+3. download segments locally
+4. decode local assembled media
+5. encode MP3
+
 ### 6. AGP 9 forces the right structure
 
 The AGP 9 migration forced an architectural cleanup that was worth doing anyway:
@@ -98,6 +112,18 @@ The AGP 9 migration forced an architectural cleanup that was worth doing anyway:
 - Compose sample shared from a library-style module
 
 This is the correct long-term structure for Android/iOS/Desktop parity.
+
+### 7. iOS host structure matters too
+
+The project initially only had shared iOS targets. That was not enough for a smooth Compose Multiplatform workflow.
+
+The correct iOS setup needed:
+
+- a shared KMP/Compose module exporting an Apple framework
+- a real `iosApp/iosApp.xcodeproj` host
+- IDE metadata pointing Android Studio to the Xcode host
+
+Without that, iOS support exists only on paper.
 
 ## What Would Have Saved Time
 
@@ -136,6 +162,8 @@ A faster implementation should have assumed from the start:
 - HLS is often the real path
 
 That would have reduced time spent treating direct URL failure as exceptional rather than expected.
+
+For Android specifically, it would also have helped to assume early that remote HLS playback might fail and that a local fragment downloader could be necessary.
 
 ### Phase 4: design the player-JS pipeline as a subsystem
 
@@ -255,6 +283,8 @@ The next major acceleration step is a fixture corpus:
 - player JS files
 - expected resolved signatures
 - expected selected formats
+- representative HLS master/audio playlists
+- representative local-fragment assembly cases
 
 Without that, every parity improvement becomes slower and riskier.
 
@@ -270,6 +300,8 @@ It is broad YouTube parity for:
 - anti-bot / attestation
 
 That is the part most likely to require continuous maintenance.
+
+The biggest platform-specific unfinished area is now broad iOS runtime validation, not iOS build structure.
 
 ## Practical Advice For Continuing This Project
 

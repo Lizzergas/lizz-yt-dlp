@@ -9,6 +9,7 @@ There is no longer any Gradle module in this project that wraps or invokes `yt-d
 - `youtube-downloader-core`: Kotlin Multiplatform public API
 - `youtube-downloader-engine-youtube`: pure Kotlin YouTube extraction and download engine
 - `android-native-media`: owned Android JNI/CMake MP3 encoder bridge using vendored LAME source
+- `iosApp`: Xcode iOS host app for the shared Compose framework
 - `sample-cli`: Clikt sample app for scripting and smoke testing
 - `sample-terminal`: Mosaic terminal sample app
 - `sample-compose`: shared Compose Multiplatform sample UI module
@@ -82,8 +83,8 @@ val path = downloader.download("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 Current state:
 
 - Desktop/JVM: real native downloader wiring through `JvmNativeYoutubeDownloaderFactory`
-- Android: app entrypoint and shared UI are wired, but Android-native downloader/transcoder is still pending
-- iOS: shared library targets compile, app integration is the next step
+- Android: real downloader and owned MP3 path are wired into the app
+- iOS: real app host exists, shared framework builds, and the iOS engine uses Ktor Darwin plus an owned Apple media bridge
 
 Useful commands:
 
@@ -91,6 +92,7 @@ Useful commands:
 ./gradlew :sample-compose:compileKotlinDesktop
 ./gradlew :sample-compose:compileKotlinIosSimulatorArm64
 ./gradlew :androidApp:assembleDebug
+./gradlew :iosApp:compileKotlinIosSimulatorArm64
 ```
 
 ## Optional Flags
@@ -106,8 +108,11 @@ What works now:
 
 - pure Kotlin native YouTube engine module
 - JVM on-device download path
-- Android on-device downloader path compiled and wired to the Compose sample
+- Android on-device downloader path compiled, wired, and manually validated on direct and HLS-fallback cases
 - Android owned native media module compiled for `arm64-v8a` and `x86_64`
+- Android HLS fallback now downloads audio fragments locally before MP3 transcoding
+- iOS app host builds from Xcode / Android Studio-compatible structure
+- iOS engine and owned Apple media bridge compile
 - mp3 output through the native engine path used by the samples
 - direct media download when URLs are usable
 - HLS fallback when direct URLs are rejected
@@ -118,8 +123,9 @@ What is still incomplete:
 - broader `signatureCipher` coverage
 - `n` parameter solving parity
 - more complete anti-bot / attestation handling
-- Android runtime verification on a device/emulator
-- iOS app integration and native transcoder
+- Android runtime verification on a physical device
+- iOS runtime verification and hardening on simulator/device
+- more shared `kotlinx-io` adoption across runtime stream/file paths
 
 ## Multiplatform Direction
 

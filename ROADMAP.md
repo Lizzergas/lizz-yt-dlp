@@ -18,7 +18,11 @@ The project currently has:
 - JVM runtime support
 - Android runtime support
 - an owned Android JNI/CMake MP3 path in `android-native-media`
+- an owned Apple-side MP3 bridge in `youtube-downloader-engine-youtube/src/iosInterop`
+- an Xcode iOS host app under `iosApp/`
 - sample apps for CLI, terminal, Desktop Compose, and Android Compose
+
+The iOS runtime path now exists in code and builds, but still needs broader runtime validation.
 
 The project no longer uses `yt-dlp` as a backend engine.
 
@@ -32,10 +36,14 @@ Current engine files:
 
 - shared extraction core:
   - `youtube-downloader-engine-youtube/src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/YoutubeExtraction.kt`
+- shared player JS subsystem:
+  - `youtube-downloader-engine-youtube/src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/playerjs/PlayerJsDecipherer.kt`
 - JVM runtime engine:
   - `youtube-downloader-engine-youtube/src/jvmMain/kotlin/com/lizz/ytdl/engine/youtube/JvmNativeYoutubeDownloadEngine.kt`
 - Android runtime engine:
   - `youtube-downloader-engine-youtube/src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidNativeYoutubeDownloadEngine.kt`
+- iOS runtime engine:
+  - `youtube-downloader-engine-youtube/src/iosMain/kotlin/com/lizz/ytdl/engine/youtube/IosNativeYoutubeDownloadEngine.kt`
 
 Current gaps:
 
@@ -71,21 +79,23 @@ Main Android files:
 
 - downloader:
   - `youtube-downloader-engine-youtube/src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidNativeYoutubeDownloadEngine.kt`
-- player JS decipherer:
-  - `youtube-downloader-engine-youtube/src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidPlayerJsDecipherer.kt`
+- shared player JS subsystem used by Android:
+  - `youtube-downloader-engine-youtube/src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/playerjs/PlayerJsDecipherer.kt`
 - transcoder:
   - `youtube-downloader-engine-youtube/src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidMp3Transcoder.kt`
 
 Current Android risks:
 
-- runtime behavior of `MediaExtractor.setDataSource(manifestUrl, headers)` across vendors
+- local HLS playlist parsing robustness
+- segment download correctness for HLS audio playlists
+- local fragment concatenation assumptions
 - PCM format/channel assumptions in `AndroidMp3Transcoder`
 - file reveal/open-directory behavior with FileKit and Android file providers
 - no instrumentation tests yet for the full Android path
 
 ### iOS
 
-iOS builds for shared code, but there is no real iOS downloader/transcoder runtime yet.
+iOS now builds with a real app host and a real runtime path in code, but still needs runtime verification and hardening.
 
 Current iOS sample file:
 
@@ -94,10 +104,12 @@ Current iOS sample file:
 Current status:
 
 - shared modules compile for iOS targets
-- Compose sample has an iOS placeholder
-- there is no iOS app target in this repository yet
-- there is no iOS-native downloader implementation yet
-- there is no iOS-native MP3 transcoder yet
+- Compose sample has iOS downloader wiring
+- there is an `iosApp/` Xcode host project in the repository
+- there is an iOS-native downloader implementation using `Ktor Darwin`
+- there is an owned iOS MP3 transcoder path in code using Apple media APIs + vendored LAME bridge
+
+Current iOS gap is no longer structural. It is runtime breadth and hardening.
 
 ### IO Model
 
@@ -105,7 +117,8 @@ Current runtime IO is mixed:
 
 - JVM uses `java.net.http.HttpClient` and `java.nio.file`
 - Android uses `HttpURLConnection`, `File`, and raw streams
-- shared code is still mostly string/JSON parsing plus abstract models
+- iOS uses `Ktor Darwin` plus platform file APIs
+- shared code has started using `kotlinx-io` for FileKit copy/move flows
 
 This is workable, but it makes the engines more divergent than they should be.
 
@@ -121,10 +134,8 @@ Convert protected YouTube media formats into usable direct URLs without relying 
 
 ### Current files
 
-- JVM decipherer:
-  - `youtube-downloader-engine-youtube/src/jvmMain/kotlin/com/lizz/ytdl/engine/youtube/JvmPlayerJsDecipherer.kt`
-- Android decipherer:
-  - `youtube-downloader-engine-youtube/src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidPlayerJsDecipherer.kt`
+- Shared decipherer:
+  - `youtube-downloader-engine-youtube/src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/playerjs/PlayerJsDecipherer.kt`
 - format model carrying cipher info:
   - `YoutubeExtraction.kt` -> `NativeAudioFormat.signatureCipher`
 

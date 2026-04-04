@@ -38,7 +38,6 @@ import io.github.vinceglb.filekit.PlatformFile as PlatformFileFactory
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
-import io.github.vinceglb.filekit.write
 import kotlinx.coroutines.launch
 
 @Composable
@@ -182,7 +181,7 @@ fun SampleApp(
                                     if (selectedDirectory != null) {
                                         val sourceFile = PlatformFileFactory(result.path)
                                         val destination = PlatformFileFactory(selectedDirectory!!, result.fileName)
-                                        destination.write(sourceFile)
+                                        FileKitIo.copy(sourceFile, destination)
                                         sourceFile.delete(mustExist = false)
                                         resultPath = destination.path
                                         logs += "Moved downloaded file into ${selectedDirectory!!.path}"

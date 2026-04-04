@@ -10,7 +10,9 @@ The current implementation is not full `yt-dlp` parity. It is a native Kotlin pr
 - a native YouTube extraction engine
 - JVM runtime support
 - Android runtime support
+- iOS runtime support in code
 - Compose sample apps for Desktop and Android
+- an Xcode iOS host app for the shared Compose framework
 
 The project no longer contains an active `yt-dlp` backend adapter module.
 
@@ -60,11 +62,13 @@ Purpose:
 Main files:
 
 - `src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/YoutubeExtraction.kt`
+- `src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/watch/`
+- `src/commonMain/kotlin/com/lizz/ytdl/engine/youtube/playerjs/`
 - `src/jvmMain/kotlin/com/lizz/ytdl/engine/youtube/JvmNativeYoutubeDownloadEngine.kt`
-- `src/jvmMain/kotlin/com/lizz/ytdl/engine/youtube/JvmPlayerJsDecipherer.kt`
 - `src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidNativeYoutubeDownloadEngine.kt`
-- `src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidPlayerJsDecipherer.kt`
 - `src/androidMain/kotlin/com/lizz/ytdl/engine/youtube/AndroidMp3Transcoder.kt`
+- `src/iosMain/kotlin/com/lizz/ytdl/engine/youtube/IosNativeYoutubeDownloadEngine.kt`
+- `src/iosMain/kotlin/com/lizz/ytdl/engine/youtube/IosMp3Transcoder.kt`
 
 This module owns the runtime logic for:
 
@@ -73,7 +77,8 @@ This module owns the runtime logic for:
 - `ytcfg` extraction
 - Innertube player calls
 - direct audio format normalization
-- partial `signatureCipher` solving
+- shared `signatureCipher` solving
+- shared `n` rewriting
 - HLS fallback
 - MP3 conversion through platform-specific implementations
 
@@ -113,7 +118,7 @@ Purpose:
 - shared Compose Multiplatform UI layer
 - Desktop real downloader wiring
 - Android real downloader wiring
-- iOS placeholder wiring
+- iOS real downloader wiring
 
 Main files:
 
@@ -129,6 +134,14 @@ Purpose:
 - Android app entrypoint required for AGP 9 compatibility
 - hosts `MainActivity`
 - passes an Android-aware downloader into the shared Compose UI
+
+### `iosApp`
+
+Purpose:
+
+- Xcode iOS host app for the shared Compose framework
+- standard Compose Multiplatform iOS entrypoint layout
+- integrates `SampleCompose` into an actual Apple app host
 
 ## Runtime Flow
 
@@ -216,6 +229,7 @@ Selection behavior:
 
 - prefers `m4a` over other extensions when otherwise comparable
 - then prefers higher bitrate
+- iOS runtime additionally prefers Apple-friendly MP4/AAC direct audio before other container/codecs
 
 ### 6. Player JS and Protected Formats
 
@@ -255,7 +269,21 @@ The Android engine:
 - uses `HttpURLConnection`
 - mirrors the same direct-media retry strategy
 - falls back to HLS when needed
-- then routes audio through Android decoding + owned native MP3 encoding
+- parses the HLS master playlist to choose an audio playlist
+- downloads the HLS audio fragments locally to a temp file
+- then routes that local assembled media file through Android decoding + owned native MP3 encoding
+
+This local-fragment approach is important because Android `MediaExtractor` proved unreliable when asked to open some remote YouTube HLS playlists directly.
+
+#### iOS
+
+The iOS engine:
+
+- uses `Ktor Darwin`
+- mirrors the same direct-media retry strategy
+- falls back to HLS when needed
+- uses an owned Apple-side Objective-C/LAME bridge for MP3 transcoding
+- is hosted by a real Xcode app project under `iosApp/`
 
 ### 8. MP3 Conversion
 
@@ -269,12 +297,21 @@ This is platform-local and not a remote dependency, but it is still external too
 
 Android conversion is owned by the project:
 
-- `MediaExtractor` reads the source stream or manifest
+- `MediaExtractor` reads the local downloaded media file
 - `MediaCodec` decodes audio to PCM
 - JNI bridge sends PCM to bundled LAME
 - encoded MP3 bytes are written to the output file
 
 This avoids FFmpegKit entirely.
+
+#### iOS
+
+iOS conversion is also owned by the project:
+
+- Objective-C wrapper uses Apple media APIs for asset reading
+- owned Apple-side bridge uses vendored LAME
+- direct local-file transcode is implemented in code
+- HLS URL transcode path is implemented in code through the same owned bridge
 
 ## Compose Sample Behavior
 
@@ -310,10 +347,12 @@ This is currently hidden behind `createAndroidSampleDownloader(activity)`.
 ### Works
 
 - JVM native download path
-- Android native download path compiles and is wired to the app
+- Android native download path compiles, is wired to the app, and has been manually validated for direct and HLS-fallback cases
 - direct media download for some videos
 - HLS fallback for videos where direct URLs 403
 - native-owned Android MP3 encoding module builds
+- Android local HLS-fragment fallback path
+- iOS engine and iOS app host compile
 
 ### Not Full Parity
 
@@ -322,5 +361,7 @@ This is currently hidden behind `createAndroidSampleDownloader(activity)`.
 - no full attestation/anti-bot handling
 - no playlist/channel logic
 - no subtitle/postprocessor ecosystem like `yt-dlp`
+
+The iOS runtime path is implemented in code, but still needs broader runtime validation and hardening.
 
 This project should currently be understood as a serious prototype and evolving library foundation, not a finished `yt-dlp` replacement.

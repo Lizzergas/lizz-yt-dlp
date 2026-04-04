@@ -29,7 +29,6 @@ internal class AndroidNativeYoutubeDownloadEngine(
     private val context: Context,
     private val commons: YoutubeExtractorCommons = YoutubeExtractorCommons(),
     private val transcoder: AndroidMp3Transcoder = AndroidMp3Transcoder(context),
-    private val playerJsDecipherer: AndroidPlayerJsDecipherer = AndroidPlayerJsDecipherer(),
 ) : YoutubeDownloadEngine {
 
     override suspend fun download(
@@ -88,18 +87,31 @@ internal class AndroidNativeYoutubeDownloadEngine(
             val manifest = resolved.hlsManifestUrls.firstOrNull()
                 ?: throw IllegalStateException("Direct download failed and no HLS manifest fallback was available")
             emit(DownloadEvent.LogEmitted("Falling back to ${manifest.kind.uppercase()} manifest from ${manifest.source}"))
-            emit(DownloadEvent.StageChanged(DownloadStage.ConvertToMp3, "Downloading and transcoding audio from ${manifest.kind.uppercase()} manifest"))
-            transcoder.transcodeManifestToMp3(
-                manifestUrl = manifest.url,
-                headers = mapOf(
-                    "Referer" to watchData.canonicalUrl,
-                    "Origin" to "https://www.youtube.com",
-                    "User-Agent" to userAgentForSource(manifest.source),
-                ),
+            val manifestHeaders = mapOf(
+                "Referer" to watchData.canonicalUrl,
+                "Origin" to "https://www.youtube.com",
+                "User-Agent" to userAgentForSource(manifest.source),
+            )
+            val playableManifestUrl = selectAndroidPlayableManifestUrl(manifest.url, manifestHeaders, emit)
+            emit(DownloadEvent.LogEmitted("Android manifest URL: $playableManifestUrl"))
+            val hlsWorkingFile = File(stagingDirectory, "audio-hls.aac")
+            emit(DownloadEvent.StageChanged(DownloadStage.DownloadAudio, "Downloading HLS audio fragments locally"))
+            downloadHlsAudioToLocalFile(
+                manifestUrl = playableManifestUrl,
+                headers = manifestHeaders,
+                outputFile = hlsWorkingFile,
+                emit = emit,
+            )
+            emit(DownloadEvent.WorkingFileResolved(hlsWorkingFile.absolutePath))
+            emit(DownloadEvent.StageChanged(DownloadStage.ConvertToMp3, "Transcoding downloaded HLS audio into mp3"))
+            transcoder.transcodeFileToMp3(
+                inputFile = hlsWorkingFile,
                 outputFile = outputFile,
                 durationSeconds = resolved.metadata.durationSeconds,
                 emit = emit,
             )
+            hlsWorkingFile.delete()
+            emit(DownloadEvent.LogEmitted("Android HLS local fragment transcode finished"))
         }
 
         emit(DownloadEvent.StageChanged(DownloadStage.Finalize, "Cleaning temporary files and finalizing output"))
@@ -171,7 +183,7 @@ internal class AndroidNativeYoutubeDownloadEngine(
                 "Accept-Encoding" to "gzip, deflate",
             )
         )
-        val solvedFormats = playerJsDecipherer.resolveCipheredFormats(resolved.audioFormats, playerJs)
+        val solvedFormats = PlayerJsDecipherer.resolveProtectedFormats(resolved.audioFormats, playerJs)
         val directAfter = solvedFormats.count { it.url != null }
         emit(DownloadEvent.LogEmitted("Native signature solver resolved ${directAfter - directBefore} protected audio format(s)"))
         return resolved.copy(audioFormats = solvedFormats)
@@ -255,6 +267,138 @@ internal class AndroidNativeYoutubeDownloadEngine(
         val response = requestBytes(url, "GET", headers, null)
         if (response.statusCode !in 200..299) throw IllegalStateException("Watch page returned HTTP ${response.statusCode}")
         return response.body.toString(response.charset)
+    }
+
+    private suspend fun selectAndroidPlayableManifestUrl(
+        masterManifestUrl: String,
+        headers: Map<String, String>,
+        emit: suspend (DownloadEvent) -> Unit,
+    ): String {
+        val manifestText = runCatching { getText(masterManifestUrl, headers) }
+            .getOrElse { error ->
+                emit(DownloadEvent.LogEmitted("Android manifest fetch failed, using original URL: ${error.message}"))
+                return masterManifestUrl
+            }
+
+        val audioPlaylists = manifestText.lineSequence()
+            .filter { it.startsWith("#EXT-X-MEDIA:") }
+            .mapNotNull { line -> parseHlsAttributes(line.removePrefix("#EXT-X-MEDIA:")) }
+            .filter { attrs -> attrs["TYPE"] == "AUDIO" }
+            .mapNotNull { attrs -> attrs["URI"] }
+            .map { resolveManifestUri(masterManifestUrl, it) }
+            .toList()
+
+        if (audioPlaylists.isEmpty()) {
+            emit(DownloadEvent.LogEmitted("Android manifest parser found no explicit audio playlists; using master manifest"))
+            return masterManifestUrl
+        }
+
+        val selected = audioPlaylists.maxByOrNull { url ->
+            Regex("""/itag/(\d+)/""").find(url)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: -1
+        } ?: audioPlaylists.first()
+
+        emit(DownloadEvent.LogEmitted("Android manifest parser selected audio playlist URL"))
+        return selected
+    }
+
+    private suspend fun downloadHlsAudioToLocalFile(
+        manifestUrl: String,
+        headers: Map<String, String>,
+        outputFile: File,
+        emit: suspend (DownloadEvent) -> Unit,
+    ) {
+        val playlistText = getText(manifestUrl, headers)
+        val lines = playlistText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+
+        val initSegment = lines.firstNotNullOfOrNull { line ->
+            if (!line.startsWith("#EXT-X-MAP:")) return@firstNotNullOfOrNull null
+            parseHlsAttributes(line.removePrefix("#EXT-X-MAP:"))?.get("URI")
+        }?.let { resolveManifestUri(manifestUrl, it) }
+
+        val segmentUrls = lines
+            .filter { !it.startsWith("#") }
+            .map { resolveManifestUri(manifestUrl, it) }
+
+        if (segmentUrls.isEmpty()) {
+            throw IllegalStateException("Android HLS downloader found no media segments in playlist")
+        }
+
+        emit(DownloadEvent.LogEmitted("Android HLS downloader segments=${segmentUrls.size}"))
+        outputFile.parentFile?.mkdirs()
+        outputFile.outputStream().use { out ->
+            initSegment?.let { url ->
+                emit(DownloadEvent.LogEmitted("Android HLS downloader writing init segment"))
+                val bytes = requestBytes(url, "GET", headers, null).body
+                out.write(bytes)
+            }
+
+            segmentUrls.forEachIndexed { index, url ->
+                val bytes = requestBytes(url, "GET", headers, null).body
+                out.write(bytes)
+                val percent = (((index + 1).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
+                if (index == 0 || (index + 1) == segmentUrls.size || percent % 10 == 0) {
+                    emit(DownloadEvent.LogEmitted("Android HLS downloader progress: segment ${index + 1}/${segmentUrls.size}"))
+                }
+                emit(
+                    DownloadEvent.ProgressChanged(
+                        TransferSnapshot(
+                            label = "Downloading HLS audio fragments",
+                            progressPercent = percent,
+                            downloadedBytes = outputFile.length(),
+                        )
+                    )
+                )
+            }
+        }
+        emit(DownloadEvent.LogEmitted("Android HLS downloader wrote local fragment file: ${outputFile.absolutePath}"))
+    }
+
+    private fun resolveManifestUri(baseUrl: String, uri: String): String {
+        return when {
+            uri.startsWith("http://") || uri.startsWith("https://") -> uri
+            uri.startsWith("//") -> "https:$uri"
+            uri.startsWith("/") -> {
+                val origin = URL(baseUrl).let { "${it.protocol}://${it.host}" }
+                "$origin$uri"
+            }
+            else -> {
+                val base = baseUrl.substringBeforeLast('/')
+                "$base/$uri"
+            }
+        }
+    }
+
+    private fun parseHlsAttributes(raw: String): Map<String, String>? {
+        val result = mutableMapOf<String, String>()
+        var index = 0
+        while (index < raw.length) {
+            while (index < raw.length && (raw[index] == ' ' || raw[index] == ',')) index++
+            if (index >= raw.length) break
+
+            val keyStart = index
+            while (index < raw.length && raw[index] != '=') index++
+            if (index >= raw.length) return null
+            val key = raw.substring(keyStart, index)
+            index++
+
+            val value = if (index < raw.length && raw[index] == '"') {
+                index++
+                val valueStart = index
+                while (index < raw.length && raw[index] != '"') index++
+                if (index > raw.length) return null
+                val out = raw.substring(valueStart, index)
+                index++
+                out
+            } else {
+                val valueStart = index
+                while (index < raw.length && raw[index] != ',') index++
+                raw.substring(valueStart, index)
+            }
+
+            result[key] = value
+            if (index < raw.length && raw[index] == ',') index++
+        }
+        return result
     }
 
     private fun requestBytes(url: String, method: String, headers: Map<String, String>, body: ByteArray?): ByteResponse {

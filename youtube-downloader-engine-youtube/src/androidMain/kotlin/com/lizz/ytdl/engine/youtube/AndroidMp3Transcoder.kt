@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.net.Uri
 import com.lizz.ytdl.androidmedia.LameEncoderBridge
 import com.lizz.ytdl.core.DownloadEvent
 import com.lizz.ytdl.core.TransferSnapshot
@@ -24,6 +25,7 @@ internal class AndroidMp3Transcoder(
         durationSeconds: Int?,
         emit: suspend (DownloadEvent) -> Unit,
     ) = withContext(Dispatchers.IO) {
+        emit(DownloadEvent.LogEmitted("Android transcoder opening local file source: ${inputFile.absolutePath}"))
         transcodeSource(
             configureExtractor = { extractor -> extractor.setDataSource(inputFile.absolutePath) },
             outputFile = outputFile,
@@ -40,8 +42,24 @@ internal class AndroidMp3Transcoder(
         durationSeconds: Int?,
         emit: suspend (DownloadEvent) -> Unit,
     ) = withContext(Dispatchers.IO) {
+        emit(DownloadEvent.LogEmitted("Android transcoder opening manifest source"))
+        emit(DownloadEvent.LogEmitted("Android manifest headers: ${headers.entries.joinToString()}"))
         transcodeSource(
-            configureExtractor = { extractor -> extractor.setDataSource(manifestUrl, headers) },
+            configureExtractor = { extractor ->
+                val directResult = runCatching {
+                    emit(DownloadEvent.LogEmitted("Android manifest source attempt: MediaExtractor.setDataSource(String, headers)"))
+                    extractor.setDataSource(manifestUrl, headers)
+                }
+
+                if (directResult.isSuccess) {
+                    emit(DownloadEvent.LogEmitted("Android manifest source opened via String URL"))
+                } else {
+                    emit(DownloadEvent.LogEmitted("Android manifest source String URL failed: ${directResult.exceptionOrNull()?.message}"))
+                    emit(DownloadEvent.LogEmitted("Android manifest source attempt: MediaExtractor.setDataSource(Context, Uri, headers)"))
+                    extractor.setDataSource(context, Uri.parse(manifestUrl), headers)
+                    emit(DownloadEvent.LogEmitted("Android manifest source opened via Context+Uri"))
+                }
+            },
             outputFile = outputFile,
             durationSeconds = durationSeconds,
             label = "Downloading audio from manifest",
@@ -50,7 +68,7 @@ internal class AndroidMp3Transcoder(
     }
 
     private suspend fun transcodeSource(
-        configureExtractor: (MediaExtractor) -> Unit,
+        configureExtractor: suspend (MediaExtractor) -> Unit,
         outputFile: File,
         durationSeconds: Int?,
         label: String,
@@ -58,10 +76,18 @@ internal class AndroidMp3Transcoder(
     ) {
         outputFile.parentFile?.mkdirs()
         val extractor = MediaExtractor()
-        configureExtractor(extractor)
+        emit(DownloadEvent.LogEmitted("Android transcoder configuring MediaExtractor"))
+        try {
+            configureExtractor(extractor)
+        } catch (e: Exception) {
+            emit(DownloadEvent.LogEmitted("Android MediaExtractor setup failed: ${e::class.simpleName}: ${e.message}"))
+            extractor.release()
+            throw e
+        }
+        emit(DownloadEvent.LogEmitted("Android transcoder track count: ${extractor.trackCount}"))
         val trackIndex = (0 until extractor.trackCount).firstOrNull { index ->
             extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-        } ?: throw IllegalStateException("No audio track found for Android transcoding")
+        } ?: throw IllegalStateException("No audio track found for Android transcoding. Track count=${extractor.trackCount}")
 
         extractor.selectTrack(trackIndex)
         val format = extractor.getTrackFormat(trackIndex)
@@ -70,10 +96,12 @@ internal class AndroidMp3Transcoder(
         val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
         val channelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
         val bitrateKbps = (format.getIntegerOrNull(MediaFormat.KEY_BIT_RATE)?.div(1000) ?: 192).coerceAtLeast(64)
+        emit(DownloadEvent.LogEmitted("Android transcoder selected track=$trackIndex mime=$mime sampleRate=$sampleRate channelCount=$channelCount bitrateKbps=$bitrateKbps"))
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
+        emit(DownloadEvent.LogEmitted("Android transcoder decoder started"))
 
         FileOutputStream(outputFile).use { outputStream ->
             LameEncoderBridge(sampleRate, channelCount, bitrateKbps).use { encoder ->
@@ -81,9 +109,11 @@ internal class AndroidMp3Transcoder(
             }
         }
 
+        emit(DownloadEvent.LogEmitted("Android transcoder decoder finished; stopping codec"))
         codec.stop()
         codec.release()
         extractor.release()
+        emit(DownloadEvent.LogEmitted("Android transcoder wrote MP3 to ${outputFile.absolutePath}"))
     }
 
     private suspend fun decodeAndEncode(
@@ -99,6 +129,8 @@ internal class AndroidMp3Transcoder(
         val encoderOutput = ByteArray(64 * 1024)
         var inputDone = false
         var outputDone = false
+        var decodedFrames = 0L
+        var lastLoggedPercent = -1
 
         while (!outputDone) {
             if (!inputDone) {
@@ -109,6 +141,7 @@ internal class AndroidMp3Transcoder(
                     if (sampleSize < 0) {
                         codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                         inputDone = true
+                        emit(DownloadEvent.LogEmitted("Android transcoder queued end-of-stream to decoder"))
                     } else {
                         val presentationTimeUs = extractor.sampleTime
                         codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
@@ -127,10 +160,15 @@ internal class AndroidMp3Transcoder(
                         val pcmBytes = ByteArray(bufferInfo.size)
                         outputBuffer.get(pcmBytes)
                         encodePcmChunk(encoder, pcmBytes, outputStream, encoderOutput)
+                        decodedFrames++
 
                         val percent = durationSeconds
                             ?.takeIf { it > 0 }
                             ?.let { ((bufferInfo.presentationTimeUs.toDouble() / 1_000_000.0 / it) * 100).roundToInt().coerceIn(0, 100) }
+                        if (percent != null && percent / 10 != lastLoggedPercent / 10) {
+                            lastLoggedPercent = percent
+                            emit(DownloadEvent.LogEmitted("Android transcoder progress: $percent% decodedFrames=$decodedFrames bytesWritten=${outputFileSize(outputStream)}"))
+                        }
                         emit(
                             DownloadEvent.ProgressChanged(
                                 TransferSnapshot(
@@ -142,10 +180,17 @@ internal class AndroidMp3Transcoder(
                         )
                     }
                     outputDone = bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                    if (outputDone) {
+                        emit(DownloadEvent.LogEmitted("Android transcoder reached decoder end-of-stream"))
+                    }
                     codec.releaseOutputBuffer(outputIndex, false)
                 }
 
-                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED || outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                    emit(DownloadEvent.LogEmitted("Android transcoder decoder output format changed: ${codec.outputFormat}"))
+                }
+
+                outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
             }
         }
 
@@ -153,6 +198,7 @@ internal class AndroidMp3Transcoder(
         if (flushed > 0) {
             outputStream.write(encoderOutput, 0, flushed)
         }
+        emit(DownloadEvent.LogEmitted("Android transcoder flushed encoder bytes=$flushed"))
     }
 
     private fun encodePcmChunk(

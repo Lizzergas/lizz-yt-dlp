@@ -34,7 +34,6 @@ internal class JvmNativeYoutubeDownloadEngine(
         .build(),
     private val commons: YoutubeExtractorCommons = YoutubeExtractorCommons(),
     private val ffmpegMp3Converter: NativeJvmMp3Converter = NativeJvmMp3Converter(),
-    private val playerJsDecipherer: JvmPlayerJsDecipherer = JvmPlayerJsDecipherer(),
 ) : YoutubeDownloadEngine {
 
     override suspend fun download(
@@ -187,7 +186,7 @@ internal class JvmNativeYoutubeDownloadEngine(
                 "Accept-Encoding" to "gzip, deflate",
             ),
         )
-        val solvedFormats = playerJsDecipherer.resolveCipheredFormats(resolved.audioFormats, playerJs)
+        val solvedFormats = PlayerJsDecipherer.resolveProtectedFormats(resolved.audioFormats, playerJs)
         val directAfter = solvedFormats.count { it.url != null }
         emit(DownloadEvent.LogEmitted("Native signature solver resolved ${directAfter - directBefore} protected audio format(s)"))
         return resolved.copy(audioFormats = solvedFormats)
