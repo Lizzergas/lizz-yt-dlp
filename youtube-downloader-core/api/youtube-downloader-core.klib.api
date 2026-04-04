@@ -32,11 +32,15 @@ abstract interface dev.lizz.ytdl.core/OutputPathResolver { // dev.lizz.ytdl.core
 
 abstract interface dev.lizz.ytdl.core/YoutubeDownloadEngine { // dev.lizz.ytdl.core/YoutubeDownloadEngine|null[0]
     abstract suspend fun download(dev.lizz.ytdl.core/DownloadRequest, kotlin.coroutines/SuspendFunction1<dev.lizz.ytdl.core/DownloadEvent, kotlin/Unit> = ...): dev.lizz.ytdl.core/DownloadResult // dev.lizz.ytdl.core/YoutubeDownloadEngine.download|download(dev.lizz.ytdl.core.DownloadRequest;kotlin.coroutines.SuspendFunction1<dev.lizz.ytdl.core.DownloadEvent,kotlin.Unit>){}[0]
+    abstract suspend fun getTranscript(kotlin/String, kotlin/Boolean = ...): kotlin/String? // dev.lizz.ytdl.core/YoutubeDownloadEngine.getTranscript|getTranscript(kotlin.String;kotlin.Boolean){}[0]
+    abstract suspend fun getTranscriptCues(kotlin/String): dev.lizz.ytdl.core/TranscriptResult? // dev.lizz.ytdl.core/YoutubeDownloadEngine.getTranscriptCues|getTranscriptCues(kotlin.String){}[0]
 }
 
 abstract interface dev.lizz.ytdl.core/YoutubeDownloader { // dev.lizz.ytdl.core/YoutubeDownloader|null[0]
     abstract suspend fun download(dev.lizz.ytdl.core/DownloadRequest, kotlin.coroutines/SuspendFunction1<dev.lizz.ytdl.core/DownloadEvent, kotlin/Unit> = ...): dev.lizz.ytdl.core/DownloadResult // dev.lizz.ytdl.core/YoutubeDownloader.download|download(dev.lizz.ytdl.core.DownloadRequest;kotlin.coroutines.SuspendFunction1<dev.lizz.ytdl.core.DownloadEvent,kotlin.Unit>){}[0]
     abstract suspend fun download(kotlin/String): kotlin/String // dev.lizz.ytdl.core/YoutubeDownloader.download|download(kotlin.String){}[0]
+    abstract suspend fun getTranscript(kotlin/String, kotlin/Boolean = ...): kotlin/String? // dev.lizz.ytdl.core/YoutubeDownloader.getTranscript|getTranscript(kotlin.String;kotlin.Boolean){}[0]
+    abstract suspend fun getTranscriptCues(kotlin/String): dev.lizz.ytdl.core/TranscriptResult? // dev.lizz.ytdl.core/YoutubeDownloader.getTranscriptCues|getTranscriptCues(kotlin.String){}[0]
 }
 
 sealed interface dev.lizz.ytdl.core/DownloadEvent { // dev.lizz.ytdl.core/DownloadEvent|null[0]
@@ -153,6 +157,8 @@ final class dev.lizz.ytdl.core/DefaultYoutubeDownloader : dev.lizz.ytdl.core/You
 
     final suspend fun download(dev.lizz.ytdl.core/DownloadRequest, kotlin.coroutines/SuspendFunction1<dev.lizz.ytdl.core/DownloadEvent, kotlin/Unit>): dev.lizz.ytdl.core/DownloadResult // dev.lizz.ytdl.core/DefaultYoutubeDownloader.download|download(dev.lizz.ytdl.core.DownloadRequest;kotlin.coroutines.SuspendFunction1<dev.lizz.ytdl.core.DownloadEvent,kotlin.Unit>){}[0]
     final suspend fun download(kotlin/String): kotlin/String // dev.lizz.ytdl.core/DefaultYoutubeDownloader.download|download(kotlin.String){}[0]
+    final suspend fun getTranscript(kotlin/String, kotlin/Boolean): kotlin/String? // dev.lizz.ytdl.core/DefaultYoutubeDownloader.getTranscript|getTranscript(kotlin.String;kotlin.Boolean){}[0]
+    final suspend fun getTranscriptCues(kotlin/String): dev.lizz.ytdl.core/TranscriptResult? // dev.lizz.ytdl.core/DefaultYoutubeDownloader.getTranscriptCues|getTranscriptCues(kotlin.String){}[0]
 }
 
 final class dev.lizz.ytdl.core/DownloadOptions { // dev.lizz.ytdl.core/DownloadOptions|null[0]
@@ -204,6 +210,47 @@ final class dev.lizz.ytdl.core/DownloadResult { // dev.lizz.ytdl.core/DownloadRe
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.lizz.ytdl.core/DownloadResult.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.lizz.ytdl.core/DownloadResult.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.lizz.ytdl.core/DownloadResult.toString|toString(){}[0]
+}
+
+final class dev.lizz.ytdl.core/TranscriptCue { // dev.lizz.ytdl.core/TranscriptCue|null[0]
+    constructor <init>(kotlin/Long, kotlin/Long, kotlin/String) // dev.lizz.ytdl.core/TranscriptCue.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.String){}[0]
+
+    final val endMs // dev.lizz.ytdl.core/TranscriptCue.endMs|{}endMs[0]
+        final fun <get-endMs>(): kotlin/Long // dev.lizz.ytdl.core/TranscriptCue.endMs.<get-endMs>|<get-endMs>(){}[0]
+    final val startMs // dev.lizz.ytdl.core/TranscriptCue.startMs|{}startMs[0]
+        final fun <get-startMs>(): kotlin/Long // dev.lizz.ytdl.core/TranscriptCue.startMs.<get-startMs>|<get-startMs>(){}[0]
+    final val text // dev.lizz.ytdl.core/TranscriptCue.text|{}text[0]
+        final fun <get-text>(): kotlin/String // dev.lizz.ytdl.core/TranscriptCue.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): kotlin/Long // dev.lizz.ytdl.core/TranscriptCue.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // dev.lizz.ytdl.core/TranscriptCue.component2|component2(){}[0]
+    final fun component3(): kotlin/String // dev.lizz.ytdl.core/TranscriptCue.component3|component3(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/String = ...): dev.lizz.ytdl.core/TranscriptCue // dev.lizz.ytdl.core/TranscriptCue.copy|copy(kotlin.Long;kotlin.Long;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.lizz.ytdl.core/TranscriptCue.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.lizz.ytdl.core/TranscriptCue.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.lizz.ytdl.core/TranscriptCue.toString|toString(){}[0]
+}
+
+final class dev.lizz.ytdl.core/TranscriptResult { // dev.lizz.ytdl.core/TranscriptResult|null[0]
+    constructor <init>(kotlin/String, kotlin/Boolean, kotlin/String, kotlin.collections/List<dev.lizz.ytdl.core/TranscriptCue>) // dev.lizz.ytdl.core/TranscriptResult.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.String;kotlin.collections.List<dev.lizz.ytdl.core.TranscriptCue>){}[0]
+
+    final val cues // dev.lizz.ytdl.core/TranscriptResult.cues|{}cues[0]
+        final fun <get-cues>(): kotlin.collections/List<dev.lizz.ytdl.core/TranscriptCue> // dev.lizz.ytdl.core/TranscriptResult.cues.<get-cues>|<get-cues>(){}[0]
+    final val isAutoGenerated // dev.lizz.ytdl.core/TranscriptResult.isAutoGenerated|{}isAutoGenerated[0]
+        final fun <get-isAutoGenerated>(): kotlin/Boolean // dev.lizz.ytdl.core/TranscriptResult.isAutoGenerated.<get-isAutoGenerated>|<get-isAutoGenerated>(){}[0]
+    final val languageCode // dev.lizz.ytdl.core/TranscriptResult.languageCode|{}languageCode[0]
+        final fun <get-languageCode>(): kotlin/String // dev.lizz.ytdl.core/TranscriptResult.languageCode.<get-languageCode>|<get-languageCode>(){}[0]
+    final val source // dev.lizz.ytdl.core/TranscriptResult.source|{}source[0]
+        final fun <get-source>(): kotlin/String // dev.lizz.ytdl.core/TranscriptResult.source.<get-source>|<get-source>(){}[0]
+
+    final fun component1(): kotlin/String // dev.lizz.ytdl.core/TranscriptResult.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // dev.lizz.ytdl.core/TranscriptResult.component2|component2(){}[0]
+    final fun component3(): kotlin/String // dev.lizz.ytdl.core/TranscriptResult.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<dev.lizz.ytdl.core/TranscriptCue> // dev.lizz.ytdl.core/TranscriptResult.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin.collections/List<dev.lizz.ytdl.core/TranscriptCue> = ...): dev.lizz.ytdl.core/TranscriptResult // dev.lizz.ytdl.core/TranscriptResult.copy|copy(kotlin.String;kotlin.Boolean;kotlin.String;kotlin.collections.List<dev.lizz.ytdl.core.TranscriptCue>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.lizz.ytdl.core/TranscriptResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.lizz.ytdl.core/TranscriptResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.lizz.ytdl.core/TranscriptResult.toString|toString(){}[0]
 }
 
 final class dev.lizz.ytdl.core/TransferSnapshot { // dev.lizz.ytdl.core/TransferSnapshot|null[0]

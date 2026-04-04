@@ -1,6 +1,6 @@
 # Usage
 
-`lizz-yt-dlp` is a Kotlin Multiplatform library for downloading YouTube audio as MP3.
+`lizz-yt-dlp` is a Kotlin Multiplatform library for downloading YouTube audio as MP3 and retrieving English transcripts.
 
 ## Add Dependencies
 
@@ -12,8 +12,8 @@ repositories {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("dev.lizz.ytdl:youtube-downloader-core:0.1.0-alpha02")
-            implementation("dev.lizz.ytdl:youtube-downloader-engine-youtube:0.1.0-alpha02")
+            implementation("dev.lizz.ytdl:youtube-downloader-core:0.1.0-alpha03")
+            implementation("dev.lizz.ytdl:youtube-downloader-engine-youtube:0.1.0-alpha03")
         }
     }
 }

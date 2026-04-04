@@ -1,6 +1,6 @@
 # lizz-yt-dlp
 
-Kotlin-first YouTube audio downloader library for JVM, Android, iOS, and Compose Multiplatform.
+Kotlin-first YouTube audio downloader and transcript library for JVM, Android, iOS, and Compose Multiplatform.
 
 ## Artifacts
 
@@ -12,8 +12,8 @@ repositories {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("dev.lizz.ytdl:youtube-downloader-core:0.1.0-alpha02")
-            implementation("dev.lizz.ytdl:youtube-downloader-engine-youtube:0.1.0-alpha02")
+            implementation("dev.lizz.ytdl:youtube-downloader-core:0.1.0-alpha03")
+            implementation("dev.lizz.ytdl:youtube-downloader-engine-youtube:0.1.0-alpha03")
         }
     }
 }
@@ -55,7 +55,7 @@ iOS uses `IosNativeYoutubeDownloaderFactory.createDefault()`.
 ## Current Limits
 
 - YouTube-only
-- audio download only
+- audio download and English transcript extraction only
 - `signatureCipher`, `n`, and anti-bot handling are still incomplete
 - JVM/Desktop MP3 conversion still requires local `ffmpeg` for now
 
