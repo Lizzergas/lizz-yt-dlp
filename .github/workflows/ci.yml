@@ -9,10 +9,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Remove local SDK overrides
+        run: rm -f local.properties
 
       - uses: actions/setup-java@v4
         with:

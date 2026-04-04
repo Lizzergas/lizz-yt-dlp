@@ -14,6 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Remove local SDK overrides
+        run: rm -f local.properties
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
