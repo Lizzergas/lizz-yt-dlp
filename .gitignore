@@ -1,0 +1,8 @@
+/.gradle/
+/build/
+.idea
+.kotlinA
+build
+/third_party/lame-3.100/
+.kotlin
+.cxx
