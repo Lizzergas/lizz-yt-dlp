@@ -89,7 +89,7 @@ internal class JvmNativeYoutubeDownloadEngine(
         }
 
         if (!directDownloadSucceeded) {
-            val manifest = resolved.hlsManifestUrls.firstOrNull()
+            val manifest = resolved.dashManifestUrls.firstOrNull() ?: resolved.hlsManifestUrls.firstOrNull()
                 ?: throw IllegalStateException("Direct download failed and no HLS manifest fallback was available")
             emit(DownloadEvent.LogEmitted("Falling back to ${manifest.kind.uppercase()} manifest from ${manifest.source}"))
             emit(DownloadEvent.StageChanged(DownloadStage.ConvertToMp3, "Downloading and transcoding audio from ${manifest.kind.uppercase()} manifest"))
@@ -357,10 +357,10 @@ internal class JvmNativeYoutubeDownloadEngine(
 
     private fun userAgentForSource(source: String): String {
         return when (source) {
-            "ios-player-api" -> "com.google.ios.youtube/21.02.3 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"
-            "tv-player-api" -> "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold (unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)"
-            "android-player-api" -> "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip"
-            else -> YoutubeExtractorCommons.BROWSER_USER_AGENT
+            "ios-player-api" -> YoutubeConstants.IOS_USER_AGENT
+            "tv-player-api" -> YoutubeConstants.TV_USER_AGENT
+            "android-player-api" -> YoutubeConstants.ANDROID_USER_AGENT
+            else -> YoutubeConstants.BROWSER_USER_AGENT
         }
     }
 }

@@ -4,9 +4,9 @@ internal object YoutubeConstants {
     const val BROWSER_USER_AGENT =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
 
-    const val ANDROID_CLIENT_VERSION = "19.09.37"
+    const val ANDROID_CLIENT_VERSION = "21.02.35"
     const val ANDROID_USER_AGENT =
-        "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip"
+        "com.google.android.youtube/21.02.35 (Linux; U; Android 11) gzip"
 
     const val IOS_CLIENT_VERSION = "21.02.3"
     const val IOS_USER_AGENT =

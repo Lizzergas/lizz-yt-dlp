@@ -9,13 +9,26 @@ import dev.lizz.ytdl.core.DownloadStage
 import dev.lizz.ytdl.core.TransferSnapshot
 import dev.lizz.ytdl.core.YoutubeDownloadEngine
 import dev.lizz.ytdl.engine.youtube.hls.HlsAudioSegments
-import java.io.ByteArrayInputStream
 import java.io.File
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
+import dev.lizz.ytdl.engine.youtube.perf.DOWNLOAD_BUFFER_SIZE_BYTES
+import dev.lizz.ytdl.engine.youtube.perf.HLS_DOWNLOAD_PARALLELISM
+import dev.lizz.ytdl.engine.youtube.perf.ProgressStepTracker
+import dev.lizz.ytdl.engine.youtube.perf.parallelMapBatched
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.headers
+import io.ktor.client.request.prepareGet
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpMethod
+import io.ktor.utils.io.readAvailable
+import java.io.ByteArrayInputStream
+import java.net.URL
 import java.util.zip.GZIPInputStream
 import java.util.zip.InflaterInputStream
 import kotlin.math.roundToInt
@@ -30,6 +43,14 @@ internal class AndroidNativeYoutubeDownloadEngine(
     private val context: Context,
     private val commons: YoutubeExtractorCommons = YoutubeExtractorCommons(),
     private val transcoder: AndroidMp3Transcoder = AndroidMp3Transcoder(),
+    private val client: HttpClient = HttpClient(OkHttp) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = 30_000
+            connectTimeoutMillis = 20_000
+            socketTimeoutMillis = 30_000
+        }
+        followRedirects = true
+    },
 ) : YoutubeDownloadEngine {
 
     override suspend fun download(
@@ -142,7 +163,7 @@ internal class AndroidNativeYoutubeDownloadEngine(
         return results
     }
 
-    private fun postPlayerRequest(apiKey: String, videoId: String, client: PlayerClientConfig): JsonObject {
+    private suspend fun postPlayerRequest(apiKey: String, videoId: String, client: PlayerClientConfig): JsonObject {
         val body = buildJsonObject {
             put("context", client.context)
             put("videoId", videoId)
@@ -152,7 +173,7 @@ internal class AndroidNativeYoutubeDownloadEngine(
 
         val response = requestBytes(
             url = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key=$apiKey",
-            method = "POST",
+            method = HttpMethod.Post,
             headers = buildMap {
                 put("Content-Type", "application/json")
                 put("User-Agent", client.userAgent)
@@ -216,55 +237,73 @@ internal class AndroidNativeYoutubeDownloadEngine(
         refererUrl: String,
         emit: suspend (DownloadEvent) -> Unit,
     ) {
-        val response = requestStream(
-            url = format.url ?: throw IllegalStateException("Missing format url"),
-            headers = buildMap {
-                put("User-Agent", userAgentForSource(format.source))
-                put("Accept-Encoding", "identity")
-                put("Accept", "*/*")
-                put("Origin", "https://www.youtube.com")
-                put("Referer", refererUrl)
-                put("Range", "bytes=0-")
+        val progressTracker = ProgressStepTracker()
+        client.prepareGet(format.url ?: throw IllegalStateException("Missing format url")) {
+            headers {
+                append("User-Agent", userAgentForSource(format.source))
+                append("Accept-Encoding", "identity")
+                append("Accept", "*/*")
+                append("Origin", "https://www.youtube.com")
+                append("Referer", refererUrl)
+                append("Range", "bytes=0-")
                 if (format.source == "ios-player-api") {
-                    put("X-YouTube-Client-Name", "5")
-                    put("X-YouTube-Client-Version", "21.02.3")
+                    append("X-YouTube-Client-Name", "5")
+                    append("X-YouTube-Client-Version", YoutubeConstants.IOS_CLIENT_VERSION)
                 }
-            },
-        )
-        if (response.statusCode !in 200..299) {
-            response.stream.close()
-            throw IllegalStateException("Native direct download returned HTTP ${response.statusCode} for ${format.describe()}")
-        }
+            }
+        }.execute { response ->
+            if (response.status.value !in 200..299) {
+                throw IllegalStateException("Native direct download returned HTTP ${response.status.value} for ${format.describe()}")
+            }
 
-        val totalBytes = response.contentLength.takeIf { it > 0L }
-        var written = 0L
-        response.stream.use { input ->
-            output.outputStream().use { out ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            val totalBytes = response.headers["Content-Length"]?.toLongOrNull()?.takeIf { it > 0L }
+            val channel = response.bodyAsChannel()
+            val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE_BYTES)
+            var written = 0L
+
+            output.outputStream().buffered(DOWNLOAD_BUFFER_SIZE_BYTES).use { out ->
                 while (true) {
-                    val read = input.read(buffer)
+                    val read = channel.readAvailable(buffer, 0, buffer.size)
                     if (read < 0) break
+                    if (read == 0) continue
                     out.write(buffer, 0, read)
                     written += read
-                    val percent = totalBytes?.let { ((written.toDouble() / it) * 100).roundToInt().coerceIn(0, 100) }
-                    emit(
-                        DownloadEvent.ProgressChanged(
-                            TransferSnapshot(
-                                label = "Downloading audio stream",
-                                progressPercent = percent,
-                                downloadedBytes = written,
-                                totalBytes = totalBytes,
-                                speedText = format.describe(),
+
+                    if (progressTracker.shouldEmit(totalBytes, written)) {
+                        emit(
+                            DownloadEvent.ProgressChanged(
+                                TransferSnapshot(
+                                    label = "Downloading audio stream",
+                                    progressPercent = progressTracker.percent(totalBytes, written),
+                                    downloadedBytes = written,
+                                    totalBytes = totalBytes,
+                                    speedText = format.describe(),
+                                )
                             )
                         )
-                    )
+                    }
                 }
+                out.flush()
+            }
+
+            if (progressTracker.shouldEmit(totalBytes, written, force = true)) {
+                emit(
+                    DownloadEvent.ProgressChanged(
+                        TransferSnapshot(
+                            label = "Downloading audio stream",
+                            progressPercent = progressTracker.percent(totalBytes, written),
+                            downloadedBytes = written,
+                            totalBytes = totalBytes,
+                            speedText = format.describe(),
+                        )
+                    )
+                )
             }
         }
     }
 
-    private fun getText(url: String, headers: Map<String, String>): String {
-        val response = requestBytes(url, "GET", headers, null)
+    private suspend fun getText(url: String, headers: Map<String, String>): String {
+        val response = requestBytes(url, HttpMethod.Get, headers, null)
         if (response.statusCode !in 200..299) throw IllegalStateException("Watch page returned HTTP ${response.statusCode}")
         return response.body.toString(response.charset)
     }
@@ -324,37 +363,46 @@ internal class AndroidNativeYoutubeDownloadEngine(
         }
 
         val outputFile = File(stagingDirectory, if (initSegment != null) "audio-hls.mp4" else "audio-hls.aac")
-        emit(DownloadEvent.LogEmitted("Android HLS downloader segments=${segmentUrls.size}"))
+        emit(DownloadEvent.LogEmitted("Android HLS downloader segments=${segmentUrls.size} parallelism=${minOf(HLS_DOWNLOAD_PARALLELISM, segmentUrls.size)}"))
         outputFile.parentFile?.mkdirs()
         var strippedId3Logged = false
+        var totalWritten = 0L
         outputFile.outputStream().use { out ->
             initSegment?.let { url ->
                 emit(DownloadEvent.LogEmitted("Android HLS downloader writing init segment"))
-                val bytes = requestBytes(url, "GET", headers, null).body
+                val bytes = requestBytes(url, HttpMethod.Get, headers, null).body
                 out.write(bytes)
+                totalWritten += bytes.size
             }
 
-            segmentUrls.forEachIndexed { index, url ->
-                val originalBytes = requestBytes(url, "GET", headers, null).body
-                val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
-                if (!strippedId3Logged && bytes.size != originalBytes.size) {
-                    strippedId3Logged = true
-                    emit(DownloadEvent.LogEmitted("Android HLS downloader stripped leading ID3 metadata from AAC segments"))
+            var completedSegments = 0
+            for (batch in segmentUrls.chunked(HLS_DOWNLOAD_PARALLELISM)) {
+                val downloadedBatch = parallelMapBatched(batch, batch.size) { url ->
+                    requestBytes(url, HttpMethod.Get, headers, null).body
                 }
-                out.write(bytes)
-                val percent = (((index + 1).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
-                if (index == 0 || (index + 1) == segmentUrls.size || percent % 10 == 0) {
-                    emit(DownloadEvent.LogEmitted("Android HLS downloader progress: segment ${index + 1}/${segmentUrls.size}"))
-                }
-                emit(
-                    DownloadEvent.ProgressChanged(
-                        TransferSnapshot(
-                            label = "Downloading HLS audio fragments",
-                            progressPercent = percent,
-                            downloadedBytes = outputFile.length(),
+                downloadedBatch.forEach { originalBytes ->
+                    val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
+                    if (!strippedId3Logged && bytes.size != originalBytes.size) {
+                        strippedId3Logged = true
+                        emit(DownloadEvent.LogEmitted("Android HLS downloader stripped leading ID3 metadata from AAC segments"))
+                    }
+                    out.write(bytes)
+                    totalWritten += bytes.size
+                    completedSegments++
+                    val percent = (((completedSegments).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
+                    if (completedSegments == 1 || completedSegments == segmentUrls.size || percent % 10 == 0) {
+                        emit(DownloadEvent.LogEmitted("Android HLS downloader progress: segment $completedSegments/${segmentUrls.size}"))
+                    }
+                    emit(
+                        DownloadEvent.ProgressChanged(
+                            TransferSnapshot(
+                                label = "Downloading HLS audio fragments",
+                                progressPercent = percent,
+                                downloadedBytes = totalWritten,
+                            )
                         )
                     )
-                )
+                }
             }
         }
         emit(DownloadEvent.LogEmitted("Android HLS downloader wrote local fragment file: ${outputFile.absolutePath}"))
@@ -409,43 +457,25 @@ internal class AndroidNativeYoutubeDownloadEngine(
         return result
     }
 
-    private fun requestBytes(url: String, method: String, headers: Map<String, String>, body: ByteArray?): ByteResponse {
-        val connection = openConnection(url, method, headers)
-        body?.let {
-            connection.doOutput = true
-            connection.outputStream.use { stream -> stream.write(it) }
+    private suspend fun requestBytes(url: String, method: HttpMethod, headers: Map<String, String>, body: ByteArray?): ByteResponse {
+        val response = client.request(url) {
+            this.method = method
+            headers { headers.forEach { (key, value) -> append(key, value) } }
+            body?.let { setBody(it) }
         }
-        val statusCode = connection.responseCode
-        val stream = if (statusCode >= 400) connection.errorStream ?: connection.inputStream else connection.inputStream
-        val bytes = stream.use { readAllBytes(it, connection.contentEncoding) }
-        val charset = charsetFromContentType(connection.contentType)
-        return ByteResponse(statusCode, bytes, charset)
+        return ByteResponse(
+            statusCode = response.status.value,
+            body = decodeResponseBody(response.bodyAsBytes(), response.headers["Content-Encoding"]),
+            charset = charsetFromContentType(response.headers["Content-Type"]),
+        )
     }
 
-    private fun requestStream(url: String, headers: Map<String, String>): StreamResponse {
-        val connection = openConnection(url, "GET", headers)
-        val statusCode = connection.responseCode
-        val stream = if (statusCode >= 400) connection.errorStream ?: connection.inputStream else connection.inputStream
-        return StreamResponse(statusCode, stream, connection.contentLengthLong)
-    }
-
-    private fun openConnection(url: String, method: String, headers: Map<String, String>): HttpURLConnection {
-        return (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 20_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-            headers.forEach { (key, value) -> setRequestProperty(key, value) }
+    private fun decodeResponseBody(bytes: ByteArray, contentEncoding: String?): ByteArray {
+        return when (contentEncoding?.lowercase()) {
+            "gzip" -> GZIPInputStream(ByteArrayInputStream(bytes)).readBytes()
+            "deflate" -> InflaterInputStream(ByteArrayInputStream(bytes)).readBytes()
+            else -> bytes
         }
-    }
-
-    private fun readAllBytes(stream: InputStream, encoding: String?): ByteArray {
-        val decoded = when (encoding?.lowercase()) {
-            "gzip" -> GZIPInputStream(stream)
-            "deflate" -> InflaterInputStream(stream)
-            else -> stream
-        }
-        return decoded.readBytes()
     }
 
     private fun charsetFromContentType(contentType: String?): Charset {
@@ -505,16 +535,15 @@ internal class AndroidNativeYoutubeDownloadEngine(
 
     private fun userAgentForSource(source: String): String {
         return when (source) {
-            "ios-player-api" -> "com.google.ios.youtube/21.02.3 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"
-            "tv-player-api" -> "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold (unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)"
-            "android-player-api" -> "com.google.android.youtube/19.09.37 (Linux; U; Android 12; US) gzip"
-            else -> YoutubeExtractorCommons.BROWSER_USER_AGENT
+            "ios-player-api" -> YoutubeConstants.IOS_USER_AGENT
+            "tv-player-api" -> YoutubeConstants.TV_USER_AGENT
+            "android-player-api" -> YoutubeConstants.ANDROID_USER_AGENT
+            else -> YoutubeConstants.BROWSER_USER_AGENT
         }
     }
 }
 
 private data class ByteResponse(val statusCode: Int, val body: ByteArray, val charset: Charset)
-private data class StreamResponse(val statusCode: Int, val stream: InputStream, val contentLength: Long)
 
 private fun JsonObject.string(key: String): String? = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull()?.takeIf { it.isNotBlank() }
 private fun JsonObject.array(key: String): List<kotlinx.serialization.json.JsonElement> = (this[key] as? kotlinx.serialization.json.JsonArray)?.toList().orEmpty()

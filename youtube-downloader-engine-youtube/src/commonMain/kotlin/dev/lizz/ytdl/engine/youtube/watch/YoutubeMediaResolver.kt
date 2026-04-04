@@ -1,7 +1,6 @@
 package dev.lizz.ytdl.engine.youtube
 
 import dev.lizz.ytdl.core.VideoMetadata
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 internal object YoutubeMediaResolver {
@@ -11,7 +10,14 @@ internal object YoutubeMediaResolver {
         playerResponses: List<Pair<String, JsonObject>>,
     ): ResolvedYoutubeMedia {
         val formats = buildList {
-            playerResponses.forEach { (source, player) -> addAll(extractAudioFormats(player, source)) }
+            playerResponses.forEach { (source, player) ->
+                addAll(
+                    extractAudioFormats(
+                        player,
+                        source
+                    )
+                )
+            }
             addAll(extractAudioFormats(initialPlayerResponse, "watch-page"))
         }.distinctBy { it.url ?: it.signatureCipher ?: it.formatId ?: it.source }
 
@@ -27,17 +33,33 @@ internal object YoutubeMediaResolver {
         }
 
         val title = listOfNotNull(
-            playerResponses.firstNotNullOfOrNull { (_, player) -> player.stringAt("videoDetails", "title") },
+            playerResponses.firstNotNullOfOrNull { (_, player) ->
+                player.stringAt(
+                    "videoDetails",
+                    "title"
+                )
+            },
             initialPlayerResponse?.stringAt("videoDetails", "title"),
-        ).firstOrNull().orEmpty().ifBlank { YoutubeWatchPageParser.parseYoutubeId(originalUrl) ?: "youtube-audio" }
+        ).firstOrNull().orEmpty()
+            .ifBlank { YoutubeWatchPageParser.parseYoutubeId(originalUrl) ?: "youtube-audio" }
 
         val uploader = listOfNotNull(
-            playerResponses.firstNotNullOfOrNull { (_, player) -> player.stringAt("videoDetails", "author") },
+            playerResponses.firstNotNullOfOrNull { (_, player) ->
+                player.stringAt(
+                    "videoDetails",
+                    "author"
+                )
+            },
             initialPlayerResponse?.stringAt("videoDetails", "author"),
         ).firstOrNull()
 
         val durationSeconds = listOfNotNull(
-            playerResponses.firstNotNullOfOrNull { (_, player) -> player.stringAt("videoDetails", "lengthSeconds")?.toIntOrNull() },
+            playerResponses.firstNotNullOfOrNull { (_, player) ->
+                player.stringAt(
+                    "videoDetails",
+                    "lengthSeconds"
+                )?.toIntOrNull()
+            },
             initialPlayerResponse?.stringAt("videoDetails", "lengthSeconds")?.toIntOrNull(),
         ).firstOrNull()
 
@@ -55,12 +77,17 @@ internal object YoutubeMediaResolver {
             ),
             audioFormats = formats.sortedByDescending { it.averageBitrate ?: 0.0 },
             hlsManifestUrls = manifests.filter { it.kind == "hls" },
+            dashManifestUrls = manifests.filter { it.kind == "dash" },
         )
     }
 
     fun pickBestAudioFormat(formats: List<NativeAudioFormat>): NativeAudioFormat {
         return formats.filter { it.url != null }.maxWithOrNull(
-            compareBy<NativeAudioFormat>({ if (it.ext == "m4a") 1 else 0 }, { it.averageBitrate ?: -1.0 })
+            compareBy(
+                { if (it.videoCodec == null) 1 else 0 },
+                { if (it.ext == "m4a") 1 else 0 },
+                { it.averageBitrate ?: -1.0 },
+            )
         ) ?: throw IllegalStateException("No usable audio format found")
     }
 
@@ -83,12 +110,18 @@ internal object YoutubeMediaResolver {
                 ?.split(',')
                 ?.map { it.trim() }
                 .orEmpty()
-            val acodec = codecs.firstOrNull { codec -> codec.startsWith("mp4a") || codec.startsWith("opus") || codec.startsWith("vorbis") }
+            val acodec = codecs.firstOrNull { codec ->
+                codec.startsWith("mp4a") || codec.startsWith("opus") || codec.startsWith("vorbis")
+            }
                 ?: if (mimeType?.startsWith("audio/") == true) mimeType.substringAfter('/') else null
             if (acodec == null) return@mapNotNull null
+            val vcodec = codecs.firstOrNull { codec ->
+                !codec.startsWith("mp4a") && !codec.startsWith("opus") && !codec.startsWith("vorbis") && codec != "none"
+            }
 
             val ext = mimeType?.substringBefore(';')?.substringAfter('/')?.ifBlank { null }
-                ?: directUrl?.substringAfterLast('.', "bin")?.substringBefore('?')?.substringBefore('#')
+                ?: directUrl?.substringAfterLast('.', "bin")?.substringBefore('?')
+                    ?.substringBefore('#')
                 ?: "bin"
 
             NativeAudioFormat(
@@ -97,7 +130,9 @@ internal object YoutubeMediaResolver {
                 ext = ext,
                 mimeType = mimeType,
                 audioCodec = acodec,
-                averageBitrate = format.double("abr") ?: format.double("bitrate")?.let { it / 1000.0 },
+                videoCodec = vcodec,
+                averageBitrate = format.double("abr") ?: format.double("bitrate")
+                    ?.let { it / 1000.0 },
                 source = source,
                 signatureCipher = rawCipher,
             )
@@ -107,8 +142,10 @@ internal object YoutubeMediaResolver {
     private fun extractManifests(player: JsonObject?, source: String): List<NativeManifest> {
         val streamingData = player?.objectAt("streamingData") ?: return emptyList()
         return buildList {
-            streamingData.string("hlsManifestUrl")?.let { add(NativeManifest(url = it, source = source, kind = "hls")) }
-            streamingData.string("dashManifestUrl")?.let { add(NativeManifest(url = it, source = source, kind = "dash")) }
+            streamingData.string("hlsManifestUrl")
+                ?.let { add(NativeManifest(url = it, source = source, kind = "hls")) }
+            streamingData.string("dashManifestUrl")
+                ?.let { add(NativeManifest(url = it, source = source, kind = "dash")) }
         }
     }
 }

@@ -27,6 +27,7 @@ class YoutubeEngineFixturesTest {
             ext = "m4a",
             mimeType = "audio/mp4",
             audioCodec = "mp4a.40.2",
+            videoCodec = null,
             averageBitrate = 128.0,
             source = "ios-player-api",
             signatureCipher = "url=https%3A%2F%2Fexample.com%2Faudio%3Ffoo%3Dbar%26n%3Dabcd&s=abcdef&sp=signature",

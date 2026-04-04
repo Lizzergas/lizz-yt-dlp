@@ -75,11 +75,11 @@ internal object YoutubeClientProfiles {
                             "client" to mapOf(
                                 "clientName" to "ANDROID",
                                 "clientVersion" to YoutubeConstants.ANDROID_CLIENT_VERSION,
-                                "androidSdkVersion" to 31,
+                                "androidSdkVersion" to 30,
                                 "hl" to "en",
                                 "gl" to "US",
                                 "osName" to "Android",
-                                "osVersion" to "12",
+                                "osVersion" to "11",
                                 "platform" to "MOBILE",
                                 "timeZone" to "UTC",
                                 "utcOffsetMinutes" to 0,

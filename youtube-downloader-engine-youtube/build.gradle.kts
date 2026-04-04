@@ -1,12 +1,11 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+
 plugins {
     id("lizz-ytdl-kmp-library")
     id("lizz-ytdl-publish")
     id("lizz-ytdl-compatibility")
     alias(libs.plugins.kotlin.serialization)
 }
-
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import java.io.ByteArrayOutputStream
 
 fun runTool(vararg command: String): String {
     val process = ProcessBuilder(*command)
@@ -69,6 +68,8 @@ kotlin {
             implementation(project(":android-native-media"))
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.okhttp)
         }
 
         jvmMain.dependencies {
@@ -94,73 +95,75 @@ kotlin {
                 "iosSimulatorArm64" -> "arm64"
                 else -> return@configureEach
             }
-            val minVersionFlag = if (sdk == "iphoneos") "-mios-version-min=15.0" else "-mios-simulator-version-min=15.0"
+            val minVersionFlag =
+                if (sdk == "iphoneos") "-mios-version-min=15.0" else "-mios-simulator-version-min=15.0"
             val outDir = layout.buildDirectory.dir("apple-media/$name")
-            val buildAppleMedia = tasks.register("buildAppleMedia${name.replaceFirstChar { it.uppercase() }}") {
-                dependsOn(prepareLameSourceApple)
-                doLast {
-                    val out = outDir.get().asFile
-                    val objDir = out.resolve("obj")
-                    objDir.mkdirs()
-                    val sdkRoot = runTool("xcrun", "--sdk", sdk, "--show-sdk-path")
-                    val clang = runTool("xcrun", "--sdk", sdk, "--find", "clang")
-                    val lameRoot = extractedLameRoot.get().asFile
-                    val includeDir = project.file("src/iosInterop/include")
-                    val wrapperSource = project.file("src/iosInterop/c/ytdl_ios_media.m")
-                    val sources = listOf(
-                        wrapperSource,
-                        lameRoot.resolve("libmp3lame/bitstream.c"),
-                        lameRoot.resolve("libmp3lame/encoder.c"),
-                        lameRoot.resolve("libmp3lame/fft.c"),
-                        lameRoot.resolve("libmp3lame/gain_analysis.c"),
-                        lameRoot.resolve("libmp3lame/id3tag.c"),
-                        lameRoot.resolve("libmp3lame/lame.c"),
-                        lameRoot.resolve("libmp3lame/newmdct.c"),
-                        lameRoot.resolve("libmp3lame/presets.c"),
-                        lameRoot.resolve("libmp3lame/psymodel.c"),
-                        lameRoot.resolve("libmp3lame/quantize.c"),
-                        lameRoot.resolve("libmp3lame/quantize_pvt.c"),
-                        lameRoot.resolve("libmp3lame/reservoir.c"),
-                        lameRoot.resolve("libmp3lame/set_get.c"),
-                        lameRoot.resolve("libmp3lame/tables.c"),
-                        lameRoot.resolve("libmp3lame/takehiro.c"),
-                        lameRoot.resolve("libmp3lame/util.c"),
-                        lameRoot.resolve("libmp3lame/vbrquantize.c"),
-                        lameRoot.resolve("libmp3lame/VbrTag.c"),
-                        lameRoot.resolve("libmp3lame/version.c"),
-                    )
-
-                    sources.forEach { source ->
-                        val output = objDir.resolve(source.nameWithoutExtension + ".o")
-                        val args = mutableListOf(
-                            clang,
-                            "-c",
-                            source.absolutePath,
-                            "-o",
-                            output.absolutePath,
-                            "-DHAVE_CONFIG_H=1",
-                            "-arch", arch,
-                            "-isysroot", sdkRoot,
-                            minVersionFlag,
-                            "-I${includeDir.absolutePath}",
-                            "-I${lameRoot.resolve("include").absolutePath}",
-                            "-I${lameRoot.resolve("libmp3lame").absolutePath}",
+            val buildAppleMedia =
+                tasks.register("buildAppleMedia${name.replaceFirstChar { it.uppercase() }}") {
+                    dependsOn(prepareLameSourceApple)
+                    doLast {
+                        val out = outDir.get().asFile
+                        val objDir = out.resolve("obj")
+                        objDir.mkdirs()
+                        val sdkRoot = runTool("xcrun", "--sdk", sdk, "--show-sdk-path")
+                        val clang = runTool("xcrun", "--sdk", sdk, "--find", "clang")
+                        val lameRoot = extractedLameRoot.get().asFile
+                        val includeDir = project.file("src/iosInterop/include")
+                        val wrapperSource = project.file("src/iosInterop/c/ytdl_ios_media.m")
+                        val sources = listOf(
+                            wrapperSource,
+                            lameRoot.resolve("libmp3lame/bitstream.c"),
+                            lameRoot.resolve("libmp3lame/encoder.c"),
+                            lameRoot.resolve("libmp3lame/fft.c"),
+                            lameRoot.resolve("libmp3lame/gain_analysis.c"),
+                            lameRoot.resolve("libmp3lame/id3tag.c"),
+                            lameRoot.resolve("libmp3lame/lame.c"),
+                            lameRoot.resolve("libmp3lame/newmdct.c"),
+                            lameRoot.resolve("libmp3lame/presets.c"),
+                            lameRoot.resolve("libmp3lame/psymodel.c"),
+                            lameRoot.resolve("libmp3lame/quantize.c"),
+                            lameRoot.resolve("libmp3lame/quantize_pvt.c"),
+                            lameRoot.resolve("libmp3lame/reservoir.c"),
+                            lameRoot.resolve("libmp3lame/set_get.c"),
+                            lameRoot.resolve("libmp3lame/tables.c"),
+                            lameRoot.resolve("libmp3lame/takehiro.c"),
+                            lameRoot.resolve("libmp3lame/util.c"),
+                            lameRoot.resolve("libmp3lame/vbrquantize.c"),
+                            lameRoot.resolve("libmp3lame/VbrTag.c"),
+                            lameRoot.resolve("libmp3lame/version.c"),
                         )
-                        if (source.extension == "m") {
-                            args += listOf("-fobjc-arc")
-                        } else {
-                            args += listOf("-std=c11")
-                        }
-                        runExec(*args.toTypedArray())
-                    }
 
-                    runExec(
-                        "xcrun", "libtool", "-static",
-                        "-o", out.resolve("libytdl_ios_media.a").absolutePath,
-                        *objDir.listFiles()!!.map { it.absolutePath }.toTypedArray(),
-                    )
+                        sources.forEach { source ->
+                            val output = objDir.resolve(source.nameWithoutExtension + ".o")
+                            val args = mutableListOf(
+                                clang,
+                                "-c",
+                                source.absolutePath,
+                                "-o",
+                                output.absolutePath,
+                                "-DHAVE_CONFIG_H=1",
+                                "-arch", arch,
+                                "-isysroot", sdkRoot,
+                                minVersionFlag,
+                                "-I${includeDir.absolutePath}",
+                                "-I${lameRoot.resolve("include").absolutePath}",
+                                "-I${lameRoot.resolve("libmp3lame").absolutePath}",
+                            )
+                            if (source.extension == "m") {
+                                args += listOf("-fobjc-arc")
+                            } else {
+                                args += listOf("-std=c11")
+                            }
+                            runExec(*args.toTypedArray())
+                        }
+
+                        runExec(
+                            "xcrun", "libtool", "-static",
+                            "-o", out.resolve("libytdl_ios_media.a").absolutePath,
+                            *objDir.listFiles()!!.map { it.absolutePath }.toTypedArray(),
+                        )
+                    }
                 }
-            }
 
             compilations.getByName("main").cinterops.create("ytdliosmedia") {
                 defFile(project.file("src/iosInterop/cinterop/ytdliosmedia.def"))

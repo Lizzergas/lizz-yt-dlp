@@ -8,14 +8,20 @@ import dev.lizz.ytdl.core.DownloadStage
 import dev.lizz.ytdl.core.TransferSnapshot
 import dev.lizz.ytdl.core.YoutubeDownloadEngine
 import dev.lizz.ytdl.engine.youtube.hls.HlsAudioSegments
+import dev.lizz.ytdl.engine.youtube.perf.DOWNLOAD_BUFFER_SIZE_BYTES
+import dev.lizz.ytdl.engine.youtube.perf.HLS_DOWNLOAD_PARALLELISM
+import dev.lizz.ytdl.engine.youtube.perf.ProgressStepTracker
+import dev.lizz.ytdl.engine.youtube.perf.parallelMapBatched
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -31,10 +37,12 @@ import platform.posix.FILE
 import platform.posix.fclose
 import platform.posix.fopen
 import platform.posix.fwrite
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.usePinned
+import io.ktor.utils.io.readAvailable
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalForeignApi::class)
@@ -190,7 +198,7 @@ internal class IosNativeYoutubeDownloadEngine(
         var lastError: Exception? = null
         for (format in formats) {
             runCatching {
-                val response = client.get(format.url ?: error("Missing format url")) {
+                client.prepareGet(format.url ?: error("Missing format url")) {
                     headers {
                         append("User-Agent", userAgentForSource(format.source))
                         append("Accept-Encoding", "identity")
@@ -203,13 +211,56 @@ internal class IosNativeYoutubeDownloadEngine(
                             append("X-YouTube-Client-Version", YoutubeConstants.IOS_CLIENT_VERSION)
                         }
                     }
+                }.execute { response ->
+                    if (response.status.value !in 200..299) {
+                        throw IllegalStateException("Native direct download returned HTTP ${response.status.value} for ${format.describe()}")
+                    }
+
+                    val totalBytes = response.headers["Content-Length"]?.toLongOrNull()?.takeIf { it > 0L }
+                    val progressTracker = ProgressStepTracker()
+                    val channel = response.bodyAsChannel()
+                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE_BYTES)
+                    var written = 0L
+                    val file = fopen(outputPath, "wb") ?: throw IllegalStateException("Failed to open iOS file for writing: $outputPath")
+                    try {
+                        while (true) {
+                            val read = channel.readAvailable(buffer, 0, buffer.size)
+                            if (read < 0) break
+                            if (read == 0) continue
+                            writeToFile(file, buffer, read)
+                            written += read
+                            if (progressTracker.shouldEmit(totalBytes, written)) {
+                                emit(
+                                    DownloadEvent.ProgressChanged(
+                                        TransferSnapshot(
+                                            label = "Downloading audio stream",
+                                            progressPercent = progressTracker.percent(totalBytes, written),
+                                            downloadedBytes = written,
+                                            totalBytes = totalBytes,
+                                            speedText = format.describe(),
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                    } finally {
+                        fclose(file)
+                    }
+
+                    if (progressTracker.shouldEmit(totalBytes, written, force = true)) {
+                        emit(
+                            DownloadEvent.ProgressChanged(
+                                TransferSnapshot(
+                                    label = "Downloading audio stream",
+                                    progressPercent = progressTracker.percent(totalBytes, written),
+                                    downloadedBytes = written,
+                                    totalBytes = totalBytes,
+                                    speedText = format.describe(),
+                                )
+                            )
+                        )
+                    }
                 }
-                if (response.status.value !in 200..299) {
-                    throw IllegalStateException("Native direct download returned HTTP ${response.status.value} for ${format.describe()}")
-                }
-                val bytes = response.bodyAsBytes()
-                writeBytes(outputPath, bytes)
-                emit(DownloadEvent.ProgressChanged(TransferSnapshot(label = "Downloading audio stream", progressPercent = 100, downloadedBytes = bytes.size.toLong(), totalBytes = bytes.size.toLong(), speedText = format.describe())))
                 format
             }.onSuccess { return it }
                 .onFailure { error ->
@@ -280,25 +331,35 @@ internal class IosNativeYoutubeDownloadEngine(
         }
 
         val outputPath = if (initSegment != null) "$temporaryDirectory/audio-hls.mp4" else "$temporaryDirectory/audio-hls.aac"
-        emit(DownloadEvent.LogEmitted("iOS HLS downloader segments=${segmentUrls.size}"))
+        emit(DownloadEvent.LogEmitted("iOS HLS downloader segments=${segmentUrls.size} parallelism=${minOf(HLS_DOWNLOAD_PARALLELISM, segmentUrls.size)}"))
         var strippedId3Logged = false
+        var totalWritten = 0L
         initSegment?.let { url ->
             emit(DownloadEvent.LogEmitted("iOS HLS downloader writing init segment"))
-            appendBytes(outputPath, client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes())
-        }
-        segmentUrls.forEachIndexed { index, url ->
-            val originalBytes = client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes()
-            val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
-            if (!strippedId3Logged && bytes.size != originalBytes.size) {
-                strippedId3Logged = true
-                emit(DownloadEvent.LogEmitted("iOS HLS downloader stripped leading ID3 metadata from AAC segments"))
-            }
+            val bytes = client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes()
             appendBytes(outputPath, bytes)
-            val percent = (((index + 1).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
-            if (index == 0 || (index + 1) == segmentUrls.size || percent % 10 == 0) {
-                emit(DownloadEvent.LogEmitted("iOS HLS downloader progress: segment ${index + 1}/${segmentUrls.size}"))
+            totalWritten += bytes.size
+        }
+        var completedSegments = 0
+        for (batch in segmentUrls.chunked(HLS_DOWNLOAD_PARALLELISM)) {
+            val downloadedBatch = parallelMapBatched(batch, batch.size) { url ->
+                client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes()
             }
-            emit(DownloadEvent.ProgressChanged(TransferSnapshot(label = "Downloading HLS audio fragments", progressPercent = percent)))
+            downloadedBatch.forEach { originalBytes ->
+                val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
+                if (!strippedId3Logged && bytes.size != originalBytes.size) {
+                    strippedId3Logged = true
+                    emit(DownloadEvent.LogEmitted("iOS HLS downloader stripped leading ID3 metadata from AAC segments"))
+                }
+                appendBytes(outputPath, bytes)
+                totalWritten += bytes.size
+                completedSegments++
+                val percent = (((completedSegments).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
+                if (completedSegments == 1 || completedSegments == segmentUrls.size || percent % 10 == 0) {
+                    emit(DownloadEvent.LogEmitted("iOS HLS downloader progress: segment $completedSegments/${segmentUrls.size}"))
+                }
+                emit(DownloadEvent.ProgressChanged(TransferSnapshot(label = "Downloading HLS audio fragments", progressPercent = percent, downloadedBytes = totalWritten)))
+            }
         }
         emit(DownloadEvent.LogEmitted("iOS HLS downloader wrote local fragment file: $outputPath"))
         return outputPath
@@ -392,9 +453,7 @@ internal class IosNativeYoutubeDownloadEngine(
     private fun writeBytes(path: String, bytes: ByteArray) {
         val file = fopen(path, "wb") ?: throw IllegalStateException("Failed to open iOS file for writing: $path")
         try {
-            bytes.usePinned { pinned ->
-                fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file)
-            }
+            writeToFile(file, bytes, bytes.size)
         } finally {
             fclose(file)
         }
@@ -403,11 +462,15 @@ internal class IosNativeYoutubeDownloadEngine(
     private fun appendBytes(path: String, bytes: ByteArray) {
         val file = fopen(path, "ab") ?: throw IllegalStateException("Failed to open iOS file for appending: $path")
         try {
-            bytes.usePinned { pinned ->
-                fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file)
-            }
+            writeToFile(file, bytes, bytes.size)
         } finally {
             fclose(file)
+        }
+    }
+
+    private fun writeToFile(file: CPointer<FILE>?, bytes: ByteArray, count: Int) {
+        bytes.usePinned { pinned ->
+            fwrite(pinned.addressOf(0), 1.convert(), count.convert(), file)
         }
     }
 
@@ -431,7 +494,8 @@ internal class IosNativeYoutubeDownloadEngine(
 
     private fun pickIosPreferredAudioFormat(formats: List<NativeAudioFormat>): NativeAudioFormat {
         return formats.filter { it.url != null }.maxWithOrNull(
-            compareBy<NativeAudioFormat>(
+            compareBy(
+                { if (it.videoCodec == null) 1 else 0 },
                 { if (it.mimeType?.startsWith("audio/mp4") == true || it.audioCodec?.startsWith("mp4a") == true) 2 else 0 },
                 { if (it.ext == "m4a" || it.ext == "mp4") 1 else 0 },
                 { it.averageBitrate ?: -1.0 },

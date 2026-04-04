@@ -9,6 +9,7 @@ internal data class NativeAudioFormat(
     val ext: String,
     val mimeType: String?,
     val audioCodec: String?,
+    val videoCodec: String?,
     val averageBitrate: Double?,
     val source: String,
     val signatureCipher: String? = null,
@@ -26,6 +27,7 @@ internal data class ResolvedYoutubeMedia(
     val metadata: VideoMetadata,
     val audioFormats: List<NativeAudioFormat>,
     val hlsManifestUrls: List<NativeManifest>,
+    val dashManifestUrls: List<NativeManifest>,
 )
 
 internal data class NativeManifest(
