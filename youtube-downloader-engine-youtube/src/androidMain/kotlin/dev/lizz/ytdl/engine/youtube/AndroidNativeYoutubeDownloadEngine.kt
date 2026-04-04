@@ -8,6 +8,7 @@ import dev.lizz.ytdl.core.DownloadResult
 import dev.lizz.ytdl.core.DownloadStage
 import dev.lizz.ytdl.core.TransferSnapshot
 import dev.lizz.ytdl.core.YoutubeDownloadEngine
+import dev.lizz.ytdl.engine.youtube.hls.HlsAudioSegments
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
@@ -94,14 +95,13 @@ internal class AndroidNativeYoutubeDownloadEngine(
             )
             val playableManifestUrl = selectAndroidPlayableManifestUrl(manifest.url, manifestHeaders, emit)
             emit(DownloadEvent.LogEmitted("Android manifest URL: $playableManifestUrl"))
-            val hlsWorkingFile = File(stagingDirectory, "audio-hls.aac")
-            emit(DownloadEvent.StageChanged(DownloadStage.DownloadAudio, "Downloading HLS audio fragments locally"))
-            downloadHlsAudioToLocalFile(
+            val hlsWorkingFile = downloadHlsAudioToLocalFile(
                 manifestUrl = playableManifestUrl,
                 headers = manifestHeaders,
-                outputFile = hlsWorkingFile,
+                stagingDirectory = stagingDirectory,
                 emit = emit,
             )
+            emit(DownloadEvent.StageChanged(DownloadStage.DownloadAudio, "Downloading HLS audio fragments locally"))
             emit(DownloadEvent.WorkingFileResolved(hlsWorkingFile.absolutePath))
             emit(DownloadEvent.StageChanged(DownloadStage.ConvertToMp3, "Transcoding downloaded HLS audio into mp3"))
             transcoder.transcodeFileToMp3(
@@ -304,9 +304,9 @@ internal class AndroidNativeYoutubeDownloadEngine(
     private suspend fun downloadHlsAudioToLocalFile(
         manifestUrl: String,
         headers: Map<String, String>,
-        outputFile: File,
+        stagingDirectory: File,
         emit: suspend (DownloadEvent) -> Unit,
-    ) {
+    ): File {
         val playlistText = getText(manifestUrl, headers)
         val lines = playlistText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
 
@@ -323,8 +323,10 @@ internal class AndroidNativeYoutubeDownloadEngine(
             throw IllegalStateException("Android HLS downloader found no media segments in playlist")
         }
 
+        val outputFile = File(stagingDirectory, if (initSegment != null) "audio-hls.mp4" else "audio-hls.aac")
         emit(DownloadEvent.LogEmitted("Android HLS downloader segments=${segmentUrls.size}"))
         outputFile.parentFile?.mkdirs()
+        var strippedId3Logged = false
         outputFile.outputStream().use { out ->
             initSegment?.let { url ->
                 emit(DownloadEvent.LogEmitted("Android HLS downloader writing init segment"))
@@ -333,7 +335,12 @@ internal class AndroidNativeYoutubeDownloadEngine(
             }
 
             segmentUrls.forEachIndexed { index, url ->
-                val bytes = requestBytes(url, "GET", headers, null).body
+                val originalBytes = requestBytes(url, "GET", headers, null).body
+                val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
+                if (!strippedId3Logged && bytes.size != originalBytes.size) {
+                    strippedId3Logged = true
+                    emit(DownloadEvent.LogEmitted("Android HLS downloader stripped leading ID3 metadata from AAC segments"))
+                }
                 out.write(bytes)
                 val percent = (((index + 1).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
                 if (index == 0 || (index + 1) == segmentUrls.size || percent % 10 == 0) {
@@ -351,6 +358,7 @@ internal class AndroidNativeYoutubeDownloadEngine(
             }
         }
         emit(DownloadEvent.LogEmitted("Android HLS downloader wrote local fragment file: ${outputFile.absolutePath}"))
+        return outputFile
     }
 
     private fun resolveManifestUri(baseUrl: String, uri: String): String {

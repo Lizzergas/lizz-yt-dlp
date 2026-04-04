@@ -7,6 +7,7 @@ import dev.lizz.ytdl.core.DownloadResult
 import dev.lizz.ytdl.core.DownloadStage
 import dev.lizz.ytdl.core.TransferSnapshot
 import dev.lizz.ytdl.core.YoutubeDownloadEngine
+import dev.lizz.ytdl.engine.youtube.hls.HlsAudioSegments
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.plugins.HttpTimeout
@@ -106,14 +107,13 @@ internal class IosNativeYoutubeDownloadEngine(
             )
             val playableManifestUrl = selectIosPlayableManifestUrl(manifest.url, manifestHeaders, emit)
             emit(DownloadEvent.LogEmitted("iOS manifest URL: $playableManifestUrl"))
-            val hlsWorkingPath = "$tempDir/audio-hls.aac"
-            emit(DownloadEvent.StageChanged(DownloadStage.DownloadAudio, "Downloading HLS audio fragments locally"))
-            downloadHlsAudioToLocalFile(
+            val hlsWorkingPath = downloadHlsAudioToLocalFile(
                 manifestUrl = playableManifestUrl,
                 headers = manifestHeaders,
-                outputPath = hlsWorkingPath,
+                temporaryDirectory = tempDir,
                 emit = emit,
             )
+            emit(DownloadEvent.StageChanged(DownloadStage.DownloadAudio, "Downloading HLS audio fragments locally"))
             emit(DownloadEvent.WorkingFileResolved(hlsWorkingPath))
             emit(DownloadEvent.StageChanged(DownloadStage.ConvertToMp3, "Transcoding downloaded HLS audio into mp3"))
             transcoder.transcodeFileToMp3(hlsWorkingPath, outputPath, resolved.metadata.durationSeconds, emit)
@@ -263,9 +263,9 @@ internal class IosNativeYoutubeDownloadEngine(
     private suspend fun downloadHlsAudioToLocalFile(
         manifestUrl: String,
         headers: Map<String, String>,
-        outputPath: String,
+        temporaryDirectory: String,
         emit: suspend (DownloadEvent) -> Unit,
-    ) {
+    ): String {
         val playlistText = getText(manifestUrl, headers)
         val lines = playlistText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
 
@@ -279,13 +279,21 @@ internal class IosNativeYoutubeDownloadEngine(
             throw IllegalStateException("iOS HLS downloader found no media segments in playlist")
         }
 
+        val outputPath = if (initSegment != null) "$temporaryDirectory/audio-hls.mp4" else "$temporaryDirectory/audio-hls.aac"
         emit(DownloadEvent.LogEmitted("iOS HLS downloader segments=${segmentUrls.size}"))
+        var strippedId3Logged = false
         initSegment?.let { url ->
             emit(DownloadEvent.LogEmitted("iOS HLS downloader writing init segment"))
             appendBytes(outputPath, client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes())
         }
         segmentUrls.forEachIndexed { index, url ->
-            appendBytes(outputPath, client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes())
+            val originalBytes = client.get(url) { headers { headers.forEach { (key, value) -> append(key, value) } } }.bodyAsBytes()
+            val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
+            if (!strippedId3Logged && bytes.size != originalBytes.size) {
+                strippedId3Logged = true
+                emit(DownloadEvent.LogEmitted("iOS HLS downloader stripped leading ID3 metadata from AAC segments"))
+            }
+            appendBytes(outputPath, bytes)
             val percent = (((index + 1).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
             if (index == 0 || (index + 1) == segmentUrls.size || percent % 10 == 0) {
                 emit(DownloadEvent.LogEmitted("iOS HLS downloader progress: segment ${index + 1}/${segmentUrls.size}"))
@@ -293,6 +301,7 @@ internal class IosNativeYoutubeDownloadEngine(
             emit(DownloadEvent.ProgressChanged(TransferSnapshot(label = "Downloading HLS audio fragments", progressPercent = percent)))
         }
         emit(DownloadEvent.LogEmitted("iOS HLS downloader wrote local fragment file: $outputPath"))
+        return outputPath
     }
 
     private fun resolveManifestUri(baseUrl: String, uri: String): String {
