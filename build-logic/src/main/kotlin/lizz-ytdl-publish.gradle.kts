@@ -55,8 +55,14 @@ extensions.configure<PublishingExtension>("publishing") {
 val signingKeyId = propertyOrEnv("SIGNING_KEY_ID")
 val signingKey = propertyOrEnv("SIGNING_KEY")?.normalizeSigningKey()
 val signingPassword = propertyOrEnv("SIGNING_PASSWORD")
+val useGpgCmd = propertyOrEnv("SIGNING_USE_GPG_CMD")?.toBooleanStrictOrNull() == true
 
-if (!signingKey.isNullOrBlank()) {
+if (useGpgCmd) {
+    extensions.configure<SigningExtension>("signing") {
+        useGpgCmd()
+        sign(extensions.getByType(PublishingExtension::class.java).publications)
+    }
+} else if (!signingKey.isNullOrBlank()) {
     extensions.configure<SigningExtension>("signing") {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
         sign(extensions.getByType(PublishingExtension::class.java).publications)

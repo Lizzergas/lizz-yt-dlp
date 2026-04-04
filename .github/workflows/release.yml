@@ -30,14 +30,33 @@ jobs:
       - name: Smoke test published artifacts
         run: ./gradlew -p smoke-tests/kmp-consumer compileKotlinJvm -PlizzYtdlVersion=0.1.0-alpha01 -PlizzYtdlRepoPath=${{ github.workspace }}/build/repo
 
+      - name: Import GPG signing key
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          printf 'pinentry-mode loopback\n' > "$GNUPGHOME/gpg.conf"
+          printf 'allow-loopback-pinentry\n' > "$GNUPGHOME/gpg-agent.conf"
+          if [[ "$SIGNING_KEY" == *"BEGIN PGP PRIVATE KEY BLOCK"* ]]; then
+            printf '%s' "$SIGNING_KEY" > "$RUNNER_TEMP/signing-key.asc"
+          else
+            printf '%s' "$SIGNING_KEY" | base64 -D > "$RUNNER_TEMP/signing-key.asc"
+          fi
+          gpg --batch --import "$RUNNER_TEMP/signing-key.asc"
+          gpg --batch --list-secret-keys --keyid-format LONG
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+
       - name: Publish to Maven Central
         env:
           CENTRAL_PORTAL_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           CENTRAL_PORTAL_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          SIGNING_USE_GPG_CMD: "true"
           SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew publishAggregationToCentralPortal
+        run: ./gradlew publishAggregationToCentralPortal -Psigning.gnupg.keyName="$SIGNING_KEY_ID" -Psigning.gnupg.passphrase="$SIGNING_PASSWORD" -Psigning.gnupg.homeDir="$GNUPGHOME"
 
       - name: Upload release diagnostics
         if: failure()
@@ -49,4 +68,5 @@ jobs:
             build/reports/**
             build/nmcp/**
             build/repo/**
+            /Users/runner/work/_temp/.gradle-actions/build-results/**
             **/build/reports/**
