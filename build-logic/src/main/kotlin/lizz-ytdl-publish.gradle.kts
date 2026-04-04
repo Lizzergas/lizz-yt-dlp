@@ -10,10 +10,6 @@ plugins {
     id("org.jetbrains.dokka")
 }
 
-val javadocJar = tasks.register<Jar>("javadocJar") {
-    archiveClassifier.set("javadoc")
-}
-
 extensions.configure<PublishingExtension>("publishing") {
     repositories {
         maven(rootProject.layout.buildDirectory.dir("repo")) {
@@ -22,7 +18,12 @@ extensions.configure<PublishingExtension>("publishing") {
     }
 
     publications.withType(MavenPublication::class.java).configureEach {
-        artifact(javadocJar)
+        val publicationJavadocJar = tasks.register<Jar>("${name}JavadocJar") {
+            archiveBaseName.set(provider { artifactId })
+            archiveClassifier.set("javadoc")
+        }
+
+        artifact(publicationJavadocJar)
 
         pom {
             name.set(project.name)

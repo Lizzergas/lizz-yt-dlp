@@ -40,11 +40,7 @@ jobs:
           chmod 700 "$GNUPGHOME"
           printf 'pinentry-mode loopback\n' > "$GNUPGHOME/gpg.conf"
           printf 'allow-loopback-pinentry\n' > "$GNUPGHOME/gpg-agent.conf"
-          if [[ "$SIGNING_KEY" == *"BEGIN PGP PRIVATE KEY BLOCK"* ]]; then
-            printf '%s' "$SIGNING_KEY" > "$RUNNER_TEMP/signing-key.asc"
-          else
-            printf '%s' "$SIGNING_KEY" | base64 -D > "$RUNNER_TEMP/signing-key.asc"
-          fi
+          printf '%s' "$SIGNING_KEY" > "$RUNNER_TEMP/signing-key.asc"
           gpg --batch --import "$RUNNER_TEMP/signing-key.asc"
           gpg --batch --list-secret-keys --keyid-format LONG
           echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
