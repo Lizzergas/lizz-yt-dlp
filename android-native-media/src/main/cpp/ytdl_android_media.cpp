@@ -23,7 +23,7 @@ lame_t asLame(jlong handle) {
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeInit(
+Java_dev_lizz_ytdl_androidmedia_LameEncoderBridge_nativeInit(
     JNIEnv* env,
     jobject /* thiz */,
     jint sampleRate,
@@ -51,7 +51,7 @@ Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeInit(
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeEncodeInterleaved(
+Java_dev_lizz_ytdl_androidmedia_LameEncoderBridge_nativeEncodeInterleaved(
     JNIEnv* env,
     jobject /* thiz */,
     jlong handle,
@@ -87,7 +87,7 @@ Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeEncodeInterleaved(
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeFlush(
+Java_dev_lizz_ytdl_androidmedia_LameEncoderBridge_nativeFlush(
     JNIEnv* env,
     jobject /* thiz */,
     jlong handle,
@@ -112,7 +112,7 @@ Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeFlush(
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_lizz_ytdl_androidmedia_LameEncoderBridge_nativeClose(
+Java_dev_lizz_ytdl_androidmedia_LameEncoderBridge_nativeClose(
     JNIEnv* /* env */,
     jobject /* thiz */,
     jlong handle

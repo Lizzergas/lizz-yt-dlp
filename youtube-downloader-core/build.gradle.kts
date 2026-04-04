@@ -1,19 +1,16 @@
 plugins {
-    alias(libs.plugins.android.multiplatform.library)
-    alias(libs.plugins.kotlin.multiplatform)
+    id("lizz-ytdl-kmp-library")
+    id("lizz-ytdl-publish")
+    id("lizz-ytdl-compatibility")
     alias(libs.plugins.kotlin.serialization)
 }
 
+description = "Public multiplatform API for lizz-yt-dlp."
+
 kotlin {
     android {
-        namespace = "com.lizz.ytdl.core"
-        compileSdk = libs.versions.android.compile.sdk.get().toInt()
-        minSdk = libs.versions.android.min.sdk.get().toInt()
+        namespace = "dev.lizz.ytdl.core"
     }
-    jvm()
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {

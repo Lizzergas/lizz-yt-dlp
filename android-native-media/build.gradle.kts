@@ -1,3 +1,5 @@
+import org.gradle.api.publish.maven.MavenPublication
+
 val lameVersion = "3.100"
 val lameArchive = rootProject.file("third_party/lame-$lameVersion.tar.gz")
 val extractedLameRoot = layout.buildDirectory.dir("third_party/lame-$lameVersion")
@@ -15,15 +17,16 @@ val prepareLameSource = tasks.register<Sync>("prepareLameSource") {
 }
 
 plugins {
-    alias(libs.plugins.android.library)
+    id("lizz-ytdl-android-library")
+    id("lizz-ytdl-publish")
 }
 
+description = "Owned Android LAME bridge used by lizz-yt-dlp."
+
 android {
-    namespace = "com.lizz.ytdl.androidmedia"
-    compileSdk = libs.versions.android.compile.sdk.get().toInt()
+    namespace = "dev.lizz.ytdl.androidmedia"
 
     defaultConfig {
-        minSdk = libs.versions.android.min.sdk.get().toInt()
         externalNativeBuild {
             cmake {
                 cppFlags += listOf("-std=c++20")
@@ -59,3 +62,14 @@ tasks.matching { it.name.startsWith("configureCMake") || it.name == "preBuild" }
     .configureEach {
         dependsOn(prepareLameSource)
     }
+
+afterEvaluate {
+    publishing {
+        publications {
+            register<MavenPublication>("release") {
+                from(components["release"])
+                artifactId = "android-native-media"
+            }
+        }
+    }
+}

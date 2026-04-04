@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    environment: deploy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify workspace
+        run: ./gradlew check publishAllPublicationsToBuildRepo :samples:compileKotlinDesktop :androidApp:assembleDebug :iosApp:compileKotlinIosSimulatorArm64
+
+      - name: Smoke test published artifacts
+        run: ./gradlew -p smoke-tests/kmp-consumer compileKotlinJvm -PlizzYtdlVersion=0.1.0-alpha01 -PlizzYtdlRepoPath=${{ github.workspace }}/build/repo
+
+      - name: Publish to Maven Central
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository

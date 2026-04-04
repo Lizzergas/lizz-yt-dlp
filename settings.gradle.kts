@@ -1,6 +1,8 @@
 import org.gradle.api.initialization.resolve.RepositoriesMode
 
 pluginManagement {
+    includeBuild("build-logic")
+
     repositories {
         gradlePluginPortal()
         google()
@@ -16,15 +18,15 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "yt-dlp-mosaic-demo"
+rootProject.name = "lizz-yt-dlp"
 
 include(
     ":youtube-downloader-core",
     ":youtube-downloader-engine-youtube",
     ":android-native-media",
-    ":sample-terminal",
-    ":sample-cli",
-    ":sample-compose",
+    ":samples",
     ":androidApp",
     ":iosApp",
 )
+
+project(":samples").projectDir = file("sample-compose")

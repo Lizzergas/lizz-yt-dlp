@@ -7,7 +7,7 @@ plugins {
 
 kotlin {
     android {
-        namespace = "com.lizz.ytdl.sample.compose.library"
+        namespace = "dev.lizz.ytdl.sample.compose.library"
         compileSdk = libs.versions.android.compile.sdk.get().toInt()
         minSdk = libs.versions.android.min.sdk.get().toInt()
     }
@@ -89,6 +89,6 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "com.lizz.ytdl.sample.compose.DesktopSampleDownloaderKt"
+        mainClass = "dev.lizz.ytdl.sample.compose.DesktopSampleDownloaderKt"
     }
 }

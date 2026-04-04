@@ -6,3 +6,4 @@ build
 /third_party/lame-3.100/
 .kotlin
 .cxx
+.gradle

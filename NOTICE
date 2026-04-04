@@ -1,0 +1,8 @@
+lizz-yt-dlp
+Copyright 2026 lizz
+
+This product includes third-party software:
+
+- LAME 3.100, distributed in `third_party/lame-3.100.tar.gz`
+
+See `THIRD_PARTY_NOTICES.md` for details.

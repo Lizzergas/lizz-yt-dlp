@@ -1,15 +1,11 @@
 # Documentation
 
-This folder contains technical documentation for the current `kt-ytdl` prototype and the lessons learned while building it.
+This folder contains the minimal project documentation needed to maintain and release `lizz-yt-dlp`.
 
 Files:
 
-- `architecture.md`: module map, runtime flow, engine behavior, and platform wiring
-- `android-native-media.md`: owned Android MP3 pipeline, JNI/CMake bridge, and third-party handling
-- `findings-and-reimplementation.md`: findings, tradeoffs, and how to rebuild this with less time and less churn
+- `architecture.md`: module map and runtime flow
+- `android-native-media.md`: Android LAME bridge notes
+- `RELEASE_CHECKLIST.md`: release process for Maven Central publishing
 
-Recommended reading order:
-
-1. `architecture.md`
-2. `android-native-media.md`
-3. `findings-and-reimplementation.md`
+Start with `architecture.md` for the current shape of the repository.

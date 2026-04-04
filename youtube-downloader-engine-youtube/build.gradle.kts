@@ -1,6 +1,7 @@
 plugins {
-    alias(libs.plugins.android.multiplatform.library)
-    alias(libs.plugins.kotlin.multiplatform)
+    id("lizz-ytdl-kmp-library")
+    id("lizz-ytdl-publish")
+    id("lizz-ytdl-compatibility")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -33,6 +34,8 @@ val lameVersion = "3.100"
 val lameArchive = rootProject.file("third_party/lame-$lameVersion.tar.gz")
 val extractedLameRoot = layout.buildDirectory.dir("third_party/lame-$lameVersion")
 
+description = "Pure Kotlin YouTube extraction and download engine for lizz-yt-dlp."
+
 val prepareLameSourceApple = tasks.register<Sync>("prepareLameSourceApple") {
     group = "build setup"
     description = "Extracts vendored LAME source for Apple native builds"
@@ -47,14 +50,8 @@ val prepareLameSourceApple = tasks.register<Sync>("prepareLameSourceApple") {
 
 kotlin {
     android {
-        namespace = "com.lizz.ytdl.engine.youtube"
-        compileSdk = libs.versions.android.compile.sdk.get().toInt()
-        minSdk = libs.versions.android.min.sdk.get().toInt()
+        namespace = "dev.lizz.ytdl.engine.youtube"
     }
-    jvm()
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {

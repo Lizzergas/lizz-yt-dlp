@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.lizz.ytdl.sample.androidapp"
+    namespace = "dev.lizz.ytdl.sample.androidapp"
     compileSdk = libs.versions.android.compile.sdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.lizz.ytdl.sample.androidapp"
+        applicationId = "dev.lizz.ytdl.sample.androidapp"
         minSdk = libs.versions.android.min.sdk.get().toInt()
         targetSdk = libs.versions.android.target.sdk.get().toInt()
         versionCode = 1
@@ -26,7 +26,7 @@ kotlin {
     }
 
     dependencies {
-        implementation(project(":sample-compose"))
+        implementation(project(":samples"))
         implementation(libs.androidx.activity.compose)
     }
 }

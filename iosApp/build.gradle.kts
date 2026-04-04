@@ -12,7 +12,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":sample-compose"))
+                implementation(project(":samples"))
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
