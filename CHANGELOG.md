@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha04
+
+- refactor the YouTube engine around a shared probe, planning, retry, and cache layer so JVM, Android, and iOS follow the same extraction pipeline
+- improve YouTube stability and performance with concurrent Innertube client probing, centralized transcript track selection, and better English regional fallback
+- split the JVM mp3 conversion path into a dedicated transcoder class while keeping `ffmpeg`-based behavior unchanged
+- update architecture and release docs, and fix CI/release smoke tests to read the current version instead of a stale hardcoded alpha
+
 ## 0.1.0-alpha03
 
 - add transcript APIs for plain English transcript text and structured transcript cues across JVM, Android, and iOS
