@@ -58,39 +58,41 @@ Important areas:
 
 - `providers/youtube/*ProviderFactory.kt`: public platform factories
 - `providers/youtube/*YoutubeProvider.kt`: platform runtime provider implementations
-- `providers/youtube/YoutubeExtraction.kt`: shared watch-page + media extraction entrypoints
+- `providers/youtube/probe/`: shared watch-page probing, player client calls, audio planning, transcript planning
+- `providers/youtube/net/`: small internal retry/cache/transport helpers used by the probe layer
+- `providers/youtube/errors/`: internal YouTube-specific failure types
 - `providers/youtube/watch/`: watch-page parsing, player client profiles, media resolution
 - `providers/youtube/transcript/`: subtitle track selection and WebVTT parsing
 - `providers/youtube/playerjs/`: protected-format JS challenge handling
 - `providers/youtube/hls/`: HLS-specific helpers
 - `providers/youtube/perf/`: download/performance helpers
+- `providers/youtube/JvmMp3Transcoder.kt`: JVM ffmpeg-backed MP3 transcoder
+- `providers/youtube/AndroidMp3Transcoder.kt`: Android platform decoder + LAME MP3 transcoder
+- `providers/youtube/IosMp3Transcoder.kt`: iOS native bridge MP3 transcoder
 
 ## Audio Download Flow
 
 For YouTube, audio download currently works like this:
 
-1. the provider fetches and parses the watch page
-2. the provider requests multiple Innertube player responses
-3. audio formats are normalized and ranked, preferring audio-only streams over muxed formats
-4. protected formats are resolved with the shared player-JS subsystem when possible
-5. direct download is attempted first
-6. if direct URLs fail:
+1. the platform provider delegates to the shared probe service
+2. the probe service fetches and parses the watch page
+3. the probe service requests multiple Innertube player responses
+4. audio formats are normalized and ranked, preferring audio-only streams over muxed formats
+5. protected formats are resolved with the shared player-JS subsystem when possible
+6. direct download is attempted first
+7. if direct URLs fail:
    - JVM prefers DASH manifest fallback and then HLS
    - Android and iOS currently use HLS fallback
-7. the downloaded media is transcoded to MP3 by the platform runtime
+8. the downloaded media is transcoded to MP3 by the platform runtime
 
 ## Transcript Flow
 
-The transcript APIs reuse the same watch-page and player-response pipeline as media downloads.
+The transcript APIs reuse the same shared probe pipeline as media downloads.
 
-1. the provider resolves player responses
+1. the provider reuses the shared probe result when available for the request path
 2. subtitle tracks are discovered from `captions.playerCaptionsTracklistRenderer.captionTracks`
-3. the current public API selects English tracks only
-4. track priority is:
-   - manual `en`
-   - manual `en-*`
-   - automatic `en`
-   - automatic `en-*`
+3. the current public API remains English-first
+4. the transcript planner prefers manual tracks over automatic tracks and handles exact or regional English matches
 5. the selected subtitle track is fetched as `fmt=vtt`
 6. a lightweight in-memory WebVTT parser extracts cues, strips markup, decodes entities, and normalizes overlapping auto-caption cues
 7. the provider returns either:
