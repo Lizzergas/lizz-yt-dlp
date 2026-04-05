@@ -1,2 +1,2 @@
 headers = ytdl_ios_media.h
-package = dev.lizz.ytdl.engine.youtube.native
+package = dev.lizz.ytdl.providers.youtube.native

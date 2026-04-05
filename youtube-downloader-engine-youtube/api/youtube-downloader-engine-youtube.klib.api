@@ -6,6 +6,6 @@
 // - Show declarations: true
 
 // Library unique name: <dev.lizz.ytdl:youtube-downloader-engine-youtube>
-final object dev.lizz.ytdl.engine.youtube/IosNativeYoutubeDownloaderFactory { // dev.lizz.ytdl.engine.youtube/IosNativeYoutubeDownloaderFactory|null[0]
-    final fun createDefault(): dev.lizz.ytdl.core/YoutubeDownloader // dev.lizz.ytdl.engine.youtube/IosNativeYoutubeDownloaderFactory.createDefault|createDefault(){}[0]
+final object dev.lizz.ytdl.providers.youtube/IosYoutubeProviderFactory { // dev.lizz.ytdl.providers.youtube/IosYoutubeProviderFactory|null[0]
+    final fun createDefault(): dev.lizz.ytdl.core/MediaClient // dev.lizz.ytdl.providers.youtube/IosYoutubeProviderFactory.createDefault|createDefault(){}[0]
 }

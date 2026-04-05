@@ -19,7 +19,7 @@ kotlin {
 }
 ```
 
-Keep the dependencies in `commonMain`, but create the downloader with the platform factory from `jvmMain`, `androidMain`, or `iosMain`.
+Keep the dependencies in `commonMain`, but create the media client with the provider factory from `jvmMain`, `androidMain`, or `iosMain`.
 
 ## Public API
 
@@ -27,53 +27,55 @@ The shared API lives in `dev.lizz.ytdl.core`.
 
 Main types:
 
-- `DownloadOptions`
-- `DownloadRequest`
-- `DownloadResult`
-- `DownloadEvent`
-- `YoutubeDownloader`
+- `ProviderId`
+- `AudioDownloadOptions`
+- `AudioDownloadRequest`
+- `AudioDownloadResult`
+- `TranscriptRequest`
+- `MediaEvent`
+- `MediaClient`
 
-## Create A Downloader
+## Create A Client
 
 Use the factory for the current platform.
 
 JVM or Desktop:
 
 ```kotlin
-import dev.lizz.ytdl.engine.youtube.JvmNativeYoutubeDownloaderFactory
+import dev.lizz.ytdl.providers.youtube.JvmYoutubeProviderFactory
 
-val downloader = JvmNativeYoutubeDownloaderFactory.createDefault()
+val client = JvmYoutubeProviderFactory.createDefault()
 ```
 
 Android:
 
 ```kotlin
 import android.content.Context
-import dev.lizz.ytdl.engine.youtube.AndroidNativeYoutubeDownloaderFactory
+import dev.lizz.ytdl.providers.youtube.AndroidYoutubeProviderFactory
 
-fun createDownloader(context: Context) =
-    AndroidNativeYoutubeDownloaderFactory.create(context)
+fun createClient(context: Context) =
+    AndroidYoutubeProviderFactory.create(context)
 ```
 
 iOS:
 
 ```kotlin
-import dev.lizz.ytdl.engine.youtube.IosNativeYoutubeDownloaderFactory
+import dev.lizz.ytdl.providers.youtube.IosYoutubeProviderFactory
 
-val downloader = IosNativeYoutubeDownloaderFactory.createDefault()
+val client = IosYoutubeProviderFactory.createDefault()
 ```
 
 ## Basic Download
 
 ```kotlin
-import dev.lizz.ytdl.core.DownloadOptions
-import dev.lizz.ytdl.core.DownloadRequest
+import dev.lizz.ytdl.core.AudioDownloadOptions
+import dev.lizz.ytdl.core.AudioDownloadRequest
 
 suspend fun downloadMp3(): String {
-    val result = downloader.download(
-        DownloadRequest(
+    val result = client.downloadAudio(
+        AudioDownloadRequest(
             url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            options = DownloadOptions(outputPath = "./downloads"),
+            options = AudioDownloadOptions(outputPath = "./downloads"),
         )
     )
 
@@ -81,29 +83,25 @@ suspend fun downloadMp3(): String {
 }
 ```
 
-You can also use the short form:
-
-```kotlin
-val path = downloader.download("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-```
+If you want explicit provider routing for a future multi-provider client, set `provider = ProviderId.YOUTUBE` on the request.
 
 ## Progress And Events
 
 Use the callback overload to receive structured progress updates.
 
 ```kotlin
-import dev.lizz.ytdl.core.DownloadEvent
+import dev.lizz.ytdl.core.MediaEvent
 
-val result = downloader.download(request) { event ->
+val result = client.downloadAudio(request) { event ->
     when (event) {
-        is DownloadEvent.StageChanged -> println("${event.stage.label}: ${event.message}")
-        is DownloadEvent.MetadataResolved -> println("Title: ${event.metadata.title}")
-        is DownloadEvent.ProgressChanged -> println(event.snapshot.label)
-        is DownloadEvent.OutputResolved -> println("Output: ${event.path}")
-        is DownloadEvent.Completed -> println("Done: ${event.outputPath}")
-        is DownloadEvent.Failed -> println("Failed: ${event.message}")
-        is DownloadEvent.LogEmitted -> println(event.message)
-        is DownloadEvent.WorkingFileResolved -> Unit
+        is MediaEvent.StageChanged -> println("${event.stage.label}: ${event.message}")
+        is MediaEvent.MetadataResolved -> println("Title: ${event.metadata.title}")
+        is MediaEvent.ProgressChanged -> println(event.snapshot.label)
+        is MediaEvent.OutputResolved -> println("Output: ${event.path}")
+        is MediaEvent.Completed -> println("Done: ${event.outputPath}")
+        is MediaEvent.Failed -> println("Failed: ${event.message}")
+        is MediaEvent.LogEmitted -> println(event.message)
+        is MediaEvent.WorkingFileResolved -> Unit
     }
 }
 ```
@@ -115,25 +113,31 @@ If English subtitles or automatic captions exist, you can retrieve them as plain
 Plain text:
 
 ```kotlin
-val transcript = downloader.getTranscript(
-    url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    includeTimecodes = false,
+val transcript = client.getTranscript(
+    TranscriptRequest(
+        url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        includeTimecodes = false,
+    )
 )
 ```
 
 Plain text with inline timecodes:
 
 ```kotlin
-val transcriptWithTimecodes = downloader.getTranscript(
-    url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    includeTimecodes = true,
+val transcriptWithTimecodes = client.getTranscript(
+    TranscriptRequest(
+        url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        includeTimecodes = true,
+    )
 )
 ```
 
 Structured cues:
 
 ```kotlin
-val transcriptResult = downloader.getTranscriptCues("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+val transcriptResult = client.getTranscriptCues(
+    TranscriptRequest(url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+)
 
 transcriptResult?.cues?.forEach { cue ->
     println("${cue.startMs} -> ${cue.endMs}: ${cue.text}")
@@ -149,7 +153,7 @@ Behavior:
 
 ## Output Path Rules
 
-`DownloadOptions.outputPath` accepts either a directory or a file path.
+`AudioDownloadOptions.outputPath` accepts either a directory or a file path.
 
 Examples:
 
@@ -170,7 +174,7 @@ If a file already exists, the library appends ` (1)`, ` (2)`, and so on.
 The clean pattern is:
 
 1. depend on the library in `commonMain`
-2. create the downloader in platform code
+2. create the client in platform code
 3. pass a small shared wrapper into your UI or shared business logic
 
 Example shared contract:
@@ -178,9 +182,9 @@ Example shared contract:
 ```kotlin
 interface AppDownloader {
     suspend fun download(
-        request: DownloadRequest,
-        emit: suspend (DownloadEvent) -> Unit = {},
-    ): DownloadResult
+        request: AudioDownloadRequest,
+        emit: suspend (MediaEvent) -> Unit = {},
+    ): AudioDownloadResult
 }
 ```
 
@@ -189,7 +193,9 @@ Then implement it per platform by delegating to the library factory.
 ## Current Limits
 
 - YouTube only
-- audio only
+- audio download and English transcript extraction only
+- transcript APIs currently prefer English only; there is no explicit language selector yet
+- transcript APIs do not expose translated subtitle retrieval yet
 - some protected formats still fall back to HLS or fail
 - JVM/Desktop currently requires local `ffmpeg` for MP3 conversion
 
@@ -197,15 +203,15 @@ Then implement it per platform by delegating to the library factory.
 
 Android:
 
-- pass an application or activity `Context` into `AndroidNativeYoutubeDownloaderFactory.create(...)`
+- pass an application or activity `Context` into `AndroidYoutubeProviderFactory.create(...)`
 - files are written into app-internal storage unless you set `outputPath`
 
 iOS:
 
-- `IosNativeYoutubeDownloaderFactory.createDefault()` requires no extra setup
+- `IosYoutubeProviderFactory.createDefault()` requires no extra setup
 - default output goes to the app `Documents` directory
 
 JVM/Desktop:
 
-- `JvmNativeYoutubeDownloaderFactory.createDefault()` is enough to start
+- `JvmYoutubeProviderFactory.createDefault()` is enough to start
 - `ffmpeg` must be available on `PATH` for MP3 conversion

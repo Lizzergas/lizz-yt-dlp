@@ -1,3 +1,52 @@
+public final class dev/lizz/ytdl/core/AudioDownloadOptions {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/AudioDownloadOptions;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/AudioDownloadOptions;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/AudioDownloadOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutputPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/lizz/ytdl/core/AudioDownloadRequest {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/AudioDownloadOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/AudioDownloadOptions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-soqcJPA ()Ljava/lang/String;
+	public final fun component3 ()Ldev/lizz/ytdl/core/AudioDownloadOptions;
+	public final fun copy-Fl7d4lw (Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/AudioDownloadOptions;)Ldev/lizz/ytdl/core/AudioDownloadRequest;
+	public static synthetic fun copy-Fl7d4lw$default (Ldev/lizz/ytdl/core/AudioDownloadRequest;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/AudioDownloadOptions;ILjava/lang/Object;)Ldev/lizz/ytdl/core/AudioDownloadRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOptions ()Ldev/lizz/ytdl/core/AudioDownloadOptions;
+	public final fun getProvider-soqcJPA ()Ljava/lang/String;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/lizz/ytdl/core/AudioDownloadResult {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/MediaMetadata;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/MediaMetadata;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ldev/lizz/ytdl/core/MediaMetadata;
+	public final fun component5-I5JVpIM ()Ljava/lang/String;
+	public final fun copy-aoFgjZE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/MediaMetadata;Ljava/lang/String;)Ldev/lizz/ytdl/core/AudioDownloadResult;
+	public static synthetic fun copy-aoFgjZE$default (Ldev/lizz/ytdl/core/AudioDownloadResult;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/MediaMetadata;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/AudioDownloadResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFileName ()Ljava/lang/String;
+	public final fun getMetadata ()Ldev/lizz/ytdl/core/MediaMetadata;
+	public final fun getMimeType ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getProvider-I5JVpIM ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class dev/lizz/ytdl/core/AudioTranscoder {
 	public abstract fun transcodeToMp3 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun transcodeToMp3$default (Ldev/lizz/ytdl/core/AudioTranscoder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -7,162 +56,164 @@ public final class dev/lizz/ytdl/core/AudioTranscoder$DefaultImpls {
 	public static synthetic fun transcodeToMp3$default (Ldev/lizz/ytdl/core/AudioTranscoder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
-public final class dev/lizz/ytdl/core/DefaultYoutubeDownloader : dev/lizz/ytdl/core/YoutubeDownloader {
-	public fun <init> (Ldev/lizz/ytdl/core/YoutubeDownloadEngine;)V
-	public fun download (Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun download (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getTranscript (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getTranscriptCues (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+public final class dev/lizz/ytdl/core/DefaultMediaClient : dev/lizz/ytdl/core/MediaClient {
+	public fun <init> (Ljava/util/List;)V
+	public fun downloadAudio (Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getTranscript (Ldev/lizz/ytdl/core/TranscriptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getTranscriptCues (Ldev/lizz/ytdl/core/TranscriptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public abstract interface class dev/lizz/ytdl/core/DownloadEvent {
+public abstract interface class dev/lizz/ytdl/core/MediaClient {
+	public abstract fun downloadAudio (Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun downloadAudio$default (Ldev/lizz/ytdl/core/MediaClient;Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getTranscript (Ldev/lizz/ytdl/core/TranscriptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getTranscriptCues (Ldev/lizz/ytdl/core/TranscriptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$Completed : dev/lizz/ytdl/core/DownloadEvent {
+public final class dev/lizz/ytdl/core/MediaClient$DefaultImpls {
+	public static synthetic fun downloadAudio$default (Ldev/lizz/ytdl/core/MediaClient;Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class dev/lizz/ytdl/core/MediaEvent {
+}
+
+public final class dev/lizz/ytdl/core/MediaEvent$Completed : dev/lizz/ytdl/core/MediaEvent {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadEvent$Completed;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$Completed;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$Completed;
+	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaEvent$Completed;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$Completed;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$Completed;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getOutputPath ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$Failed : dev/lizz/ytdl/core/DownloadEvent {
+public final class dev/lizz/ytdl/core/MediaEvent$Failed : dev/lizz/ytdl/core/MediaEvent {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadEvent$Failed;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$Failed;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$Failed;
+	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaEvent$Failed;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$Failed;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$Failed;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getMessage ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$LogEmitted : dev/lizz/ytdl/core/DownloadEvent {
+public final class dev/lizz/ytdl/core/MediaEvent$LogEmitted : dev/lizz/ytdl/core/MediaEvent {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadEvent$LogEmitted;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$LogEmitted;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$LogEmitted;
+	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaEvent$LogEmitted;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$LogEmitted;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$LogEmitted;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getMessage ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$MetadataResolved : dev/lizz/ytdl/core/DownloadEvent {
-	public fun <init> (Ldev/lizz/ytdl/core/VideoMetadata;)V
-	public final fun component1 ()Ldev/lizz/ytdl/core/VideoMetadata;
-	public final fun copy (Ldev/lizz/ytdl/core/VideoMetadata;)Ldev/lizz/ytdl/core/DownloadEvent$MetadataResolved;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$MetadataResolved;Ldev/lizz/ytdl/core/VideoMetadata;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$MetadataResolved;
+public final class dev/lizz/ytdl/core/MediaEvent$MetadataResolved : dev/lizz/ytdl/core/MediaEvent {
+	public fun <init> (Ldev/lizz/ytdl/core/MediaMetadata;)V
+	public final fun component1 ()Ldev/lizz/ytdl/core/MediaMetadata;
+	public final fun copy (Ldev/lizz/ytdl/core/MediaMetadata;)Ldev/lizz/ytdl/core/MediaEvent$MetadataResolved;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$MetadataResolved;Ldev/lizz/ytdl/core/MediaMetadata;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$MetadataResolved;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getMetadata ()Ldev/lizz/ytdl/core/VideoMetadata;
+	public final fun getMetadata ()Ldev/lizz/ytdl/core/MediaMetadata;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$OutputResolved : dev/lizz/ytdl/core/DownloadEvent {
+public final class dev/lizz/ytdl/core/MediaEvent$OutputResolved : dev/lizz/ytdl/core/MediaEvent {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadEvent$OutputResolved;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$OutputResolved;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$OutputResolved;
+	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaEvent$OutputResolved;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$OutputResolved;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$OutputResolved;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getPath ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$ProgressChanged : dev/lizz/ytdl/core/DownloadEvent {
+public final class dev/lizz/ytdl/core/MediaEvent$ProgressChanged : dev/lizz/ytdl/core/MediaEvent {
 	public fun <init> (Ldev/lizz/ytdl/core/TransferSnapshot;)V
 	public final fun component1 ()Ldev/lizz/ytdl/core/TransferSnapshot;
-	public final fun copy (Ldev/lizz/ytdl/core/TransferSnapshot;)Ldev/lizz/ytdl/core/DownloadEvent$ProgressChanged;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$ProgressChanged;Ldev/lizz/ytdl/core/TransferSnapshot;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$ProgressChanged;
+	public final fun copy (Ldev/lizz/ytdl/core/TransferSnapshot;)Ldev/lizz/ytdl/core/MediaEvent$ProgressChanged;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$ProgressChanged;Ldev/lizz/ytdl/core/TransferSnapshot;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$ProgressChanged;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getSnapshot ()Ldev/lizz/ytdl/core/TransferSnapshot;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$StageChanged : dev/lizz/ytdl/core/DownloadEvent {
-	public fun <init> (Ldev/lizz/ytdl/core/DownloadStage;Ljava/lang/String;)V
-	public final fun component1 ()Ldev/lizz/ytdl/core/DownloadStage;
+public final class dev/lizz/ytdl/core/MediaEvent$StageChanged : dev/lizz/ytdl/core/MediaEvent {
+	public fun <init> (Ldev/lizz/ytdl/core/MediaStage;Ljava/lang/String;)V
+	public final fun component1 ()Ldev/lizz/ytdl/core/MediaStage;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ldev/lizz/ytdl/core/DownloadStage;Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadEvent$StageChanged;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$StageChanged;Ldev/lizz/ytdl/core/DownloadStage;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$StageChanged;
+	public final fun copy (Ldev/lizz/ytdl/core/MediaStage;Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaEvent$StageChanged;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$StageChanged;Ldev/lizz/ytdl/core/MediaStage;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$StageChanged;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getMessage ()Ljava/lang/String;
-	public final fun getStage ()Ldev/lizz/ytdl/core/DownloadStage;
+	public final fun getStage ()Ldev/lizz/ytdl/core/MediaStage;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadEvent$WorkingFileResolved : dev/lizz/ytdl/core/DownloadEvent {
+public final class dev/lizz/ytdl/core/MediaEvent$WorkingFileResolved : dev/lizz/ytdl/core/MediaEvent {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadEvent$WorkingFileResolved;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadEvent$WorkingFileResolved;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadEvent$WorkingFileResolved;
+	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaEvent$WorkingFileResolved;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaEvent$WorkingFileResolved;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaEvent$WorkingFileResolved;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getPath ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadOptions {
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadOptions;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadOptions;Ljava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadOptions;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getOutputPath ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/lizz/ytdl/core/DownloadRequest {
-	public fun <init> (Ljava/lang/String;Ldev/lizz/ytdl/core/DownloadOptions;)V
-	public synthetic fun <init> (Ljava/lang/String;Ldev/lizz/ytdl/core/DownloadOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ldev/lizz/ytdl/core/DownloadOptions;
-	public final fun copy (Ljava/lang/String;Ldev/lizz/ytdl/core/DownloadOptions;)Ldev/lizz/ytdl/core/DownloadRequest;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadRequest;Ljava/lang/String;Ldev/lizz/ytdl/core/DownloadOptions;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadRequest;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getOptions ()Ldev/lizz/ytdl/core/DownloadOptions;
-	public final fun getUrl ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/lizz/ytdl/core/DownloadResult {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/VideoMetadata;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/VideoMetadata;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+public final class dev/lizz/ytdl/core/MediaMetadata {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ldev/lizz/ytdl/core/VideoMetadata;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/VideoMetadata;)Ldev/lizz/ytdl/core/DownloadResult;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/DownloadResult;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/lizz/ytdl/core/VideoMetadata;ILjava/lang/Object;)Ldev/lizz/ytdl/core/DownloadResult;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()I
+	public final fun component7 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Ldev/lizz/ytdl/core/MediaMetadata;
+	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/MediaMetadata;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/MediaMetadata;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getFileName ()Ljava/lang/String;
-	public final fun getMetadata ()Ldev/lizz/ytdl/core/VideoMetadata;
-	public final fun getMimeType ()Ljava/lang/String;
-	public final fun getPath ()Ljava/lang/String;
+	public final fun getAvailableAudioFormats ()I
+	public final fun getBestAudioDescription ()Ljava/lang/String;
+	public final fun getCreator ()Ljava/lang/String;
+	public final fun getDurationSeconds ()Ljava/lang/Integer;
+	public final fun getDurationText ()Ljava/lang/String;
+	public final fun getSourceUrl ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/DownloadStage : java/lang/Enum {
-	public static final field ConvertToMp3 Ldev/lizz/ytdl/core/DownloadStage;
-	public static final field DownloadAudio Ldev/lizz/ytdl/core/DownloadStage;
-	public static final field Finalize Ldev/lizz/ytdl/core/DownloadStage;
-	public static final field PrepareBackend Ldev/lizz/ytdl/core/DownloadStage;
-	public static final field ProbeMetadata Ldev/lizz/ytdl/core/DownloadStage;
+public abstract interface class dev/lizz/ytdl/core/MediaProvider {
+	public abstract fun canHandle (Ljava/lang/String;)Z
+	public abstract fun downloadAudio (Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun downloadAudio$default (Ldev/lizz/ytdl/core/MediaProvider;Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getId-I5JVpIM ()Ljava/lang/String;
+	public abstract fun getTranscript (Ldev/lizz/ytdl/core/TranscriptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getTranscriptCues (Ldev/lizz/ytdl/core/TranscriptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class dev/lizz/ytdl/core/MediaProvider$DefaultImpls {
+	public static synthetic fun downloadAudio$default (Ldev/lizz/ytdl/core/MediaProvider;Ldev/lizz/ytdl/core/AudioDownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class dev/lizz/ytdl/core/MediaStage : java/lang/Enum {
+	public static final field ConvertOutput Ldev/lizz/ytdl/core/MediaStage;
+	public static final field DownloadAudio Ldev/lizz/ytdl/core/MediaStage;
+	public static final field Finalize Ldev/lizz/ytdl/core/MediaStage;
+	public static final field PrepareProvider Ldev/lizz/ytdl/core/MediaStage;
+	public static final field ProbeMetadata Ldev/lizz/ytdl/core/MediaStage;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getLabel ()Ljava/lang/String;
-	public static fun valueOf (Ljava/lang/String;)Ldev/lizz/ytdl/core/DownloadStage;
-	public static fun values ()[Ldev/lizz/ytdl/core/DownloadStage;
+	public static fun valueOf (Ljava/lang/String;)Ldev/lizz/ytdl/core/MediaStage;
+	public static fun values ()[Ldev/lizz/ytdl/core/MediaStage;
 }
 
 public abstract interface class dev/lizz/ytdl/core/OutputPathResolver {
@@ -172,6 +223,25 @@ public abstract interface class dev/lizz/ytdl/core/OutputPathResolver {
 
 public final class dev/lizz/ytdl/core/OutputPathResolver$DefaultImpls {
 	public static synthetic fun resolveAudioPath$default (Ldev/lizz/ytdl/core/OutputPathResolver;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class dev/lizz/ytdl/core/ProviderId {
+	public static final field Companion Ldev/lizz/ytdl/core/ProviderId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Ldev/lizz/ytdl/core/ProviderId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class dev/lizz/ytdl/core/ProviderId$Companion {
+	public final fun getYOUTUBE-I5JVpIM ()Ljava/lang/String;
 }
 
 public final class dev/lizz/ytdl/core/TranscriptCue {
@@ -189,17 +259,37 @@ public final class dev/lizz/ytdl/core/TranscriptCue {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class dev/lizz/ytdl/core/TranscriptResult {
-	public fun <init> (Ljava/lang/String;ZLjava/lang/String;Ljava/util/List;)V
+public final class dev/lizz/ytdl/core/TranscriptRequest {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Z
+	public final fun component2-soqcJPA ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;ZLjava/lang/String;Ljava/util/List;)Ldev/lizz/ytdl/core/TranscriptResult;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/TranscriptResult;Ljava/lang/String;ZLjava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ldev/lizz/ytdl/core/TranscriptResult;
+	public final fun component4 ()Z
+	public final fun copy-45OjrRM (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Ldev/lizz/ytdl/core/TranscriptRequest;
+	public static synthetic fun copy-45OjrRM$default (Ldev/lizz/ytdl/core/TranscriptRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Ldev/lizz/ytdl/core/TranscriptRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIncludeTimecodes ()Z
+	public final fun getLanguageCode ()Ljava/lang/String;
+	public final fun getProvider-soqcJPA ()Ljava/lang/String;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/lizz/ytdl/core/TranscriptResult {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-I5JVpIM ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy-2TpyixY (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/util/List;)Ldev/lizz/ytdl/core/TranscriptResult;
+	public static synthetic fun copy-2TpyixY$default (Ldev/lizz/ytdl/core/TranscriptResult;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ldev/lizz/ytdl/core/TranscriptResult;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCues ()Ljava/util/List;
 	public final fun getLanguageCode ()Ljava/lang/String;
+	public final fun getProvider-I5JVpIM ()Ljava/lang/String;
 	public final fun getSource ()Ljava/lang/String;
 	public fun hashCode ()I
 	public final fun isAutoGenerated ()Z
@@ -227,56 +317,5 @@ public final class dev/lizz/ytdl/core/TransferSnapshot {
 	public final fun getTotalBytes ()Ljava/lang/Long;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/lizz/ytdl/core/VideoMetadata {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/Integer;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()I
-	public final fun component7 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)Ldev/lizz/ytdl/core/VideoMetadata;
-	public static synthetic fun copy$default (Ldev/lizz/ytdl/core/VideoMetadata;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ILjava/lang/Object;)Ldev/lizz/ytdl/core/VideoMetadata;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAvailableAudioFormats ()I
-	public final fun getBestAudioDescription ()Ljava/lang/String;
-	public final fun getDurationSeconds ()Ljava/lang/Integer;
-	public final fun getDurationText ()Ljava/lang/String;
-	public final fun getSourceUrl ()Ljava/lang/String;
-	public final fun getTitle ()Ljava/lang/String;
-	public final fun getUploader ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class dev/lizz/ytdl/core/YoutubeDownloadEngine {
-	public abstract fun download (Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun download$default (Ldev/lizz/ytdl/core/YoutubeDownloadEngine;Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun getTranscript (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun getTranscript$default (Ldev/lizz/ytdl/core/YoutubeDownloadEngine;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun getTranscriptCues (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class dev/lizz/ytdl/core/YoutubeDownloadEngine$DefaultImpls {
-	public static synthetic fun download$default (Ldev/lizz/ytdl/core/YoutubeDownloadEngine;Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun getTranscript$default (Ldev/lizz/ytdl/core/YoutubeDownloadEngine;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-}
-
-public abstract interface class dev/lizz/ytdl/core/YoutubeDownloader {
-	public abstract fun download (Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun download (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun download$default (Ldev/lizz/ytdl/core/YoutubeDownloader;Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun getTranscript (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun getTranscript$default (Ldev/lizz/ytdl/core/YoutubeDownloader;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun getTranscriptCues (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class dev/lizz/ytdl/core/YoutubeDownloader$DefaultImpls {
-	public static synthetic fun download$default (Ldev/lizz/ytdl/core/YoutubeDownloader;Ldev/lizz/ytdl/core/DownloadRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun getTranscript$default (Ldev/lizz/ytdl/core/YoutubeDownloader;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 

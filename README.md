@@ -1,12 +1,12 @@
 # lizz-yt-dlp
 
-Kotlin-first YouTube audio downloader and transcript library for JVM, Android, iOS, and Compose Multiplatform.
+Provider-based Kotlin Multiplatform media client with a built-in YouTube provider for audio downloads and English transcripts.
 
 ## Artifacts
 
 ```kotlin
 repositories {
-            mavenCentral()
+    mavenCentral()
 }
 
 kotlin {
@@ -24,29 +24,29 @@ Published Maven coordinates and Kotlin packages use `dev.lizz.ytdl`.
 ## Usage
 
 ```kotlin
-import dev.lizz.ytdl.core.DownloadOptions
-import dev.lizz.ytdl.core.DownloadRequest
-import dev.lizz.ytdl.engine.youtube.JvmNativeYoutubeDownloaderFactory
+import dev.lizz.ytdl.core.AudioDownloadOptions
+import dev.lizz.ytdl.core.AudioDownloadRequest
+import dev.lizz.ytdl.providers.youtube.JvmYoutubeProviderFactory
 
 suspend fun downloadAudio(): String {
-    val downloader = JvmNativeYoutubeDownloaderFactory.createDefault()
-    return downloader.download(
-        DownloadRequest(
+    val client = JvmYoutubeProviderFactory.createDefault()
+    return client.downloadAudio(
+        AudioDownloadRequest(
             url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            options = DownloadOptions(outputPath = "./downloads")
+            options = AudioDownloadOptions(outputPath = "./downloads")
         )
     ).path
 }
 ```
 
-Android uses `AndroidNativeYoutubeDownloaderFactory.create(context)`.
+Android uses `AndroidYoutubeProviderFactory.create(context)`.
 
-iOS uses `IosNativeYoutubeDownloaderFactory.createDefault()`.
+iOS uses `IosYoutubeProviderFactory.createDefault()`.
 
 ## Modules
 
 - `youtube-downloader-core`: public KMP API
-- `youtube-downloader-engine-youtube`: YouTube extraction and download engine
+- `youtube-downloader-engine-youtube`: built-in YouTube provider implementation and factories
 - `android-native-media`: owned Android LAME bridge used by the engine
 - `samples`: Compose Multiplatform sample module
 - `androidApp`: Android sample host app

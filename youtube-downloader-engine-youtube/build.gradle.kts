@@ -49,7 +49,7 @@ val prepareLameSourceApple = tasks.register<Sync>("prepareLameSourceApple") {
 
 kotlin {
     android {
-        namespace = "dev.lizz.ytdl.engine.youtube"
+        namespace = "dev.lizz.ytdl.providers.youtube"
     }
 
     sourceSets {

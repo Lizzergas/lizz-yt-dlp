@@ -14,6 +14,6 @@ public interface AudioTranscoder {
         inputPath: String,
         outputPath: String,
         durationSeconds: Int? = null,
-        emit: suspend (DownloadEvent) -> Unit = {},
+        emit: suspend (MediaEvent) -> Unit = {},
     )
 }

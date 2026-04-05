@@ -34,7 +34,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import dev.lizz.ytdl.core.DownloadEvent
+import dev.lizz.ytdl.core.MediaEvent
 import dev.lizz.ytdl.core.TranscriptResult
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -191,32 +191,32 @@ fun SampleApp(
                                             val request = buildDownloadRequest(url, if (selectedDirectory == null) outputPath else "")
                                             val result = downloader.download(request) { event ->
                                                 when (event) {
-                                                    is DownloadEvent.StageChanged -> {
+                                                    is MediaEvent.StageChanged -> {
                                                         status = event.message
                                                         logs += "${event.stage.label}: ${event.message}"
                                                     }
 
-                                                    is DownloadEvent.LogEmitted -> {
+                                                    is MediaEvent.LogEmitted -> {
                                                         if (event.message.contains("Falling back to ")) {
                                                             usedFallback = true
                                                         }
                                                         logs += event.message
                                                     }
 
-                                                    is DownloadEvent.ProgressChanged -> {
+                                                    is MediaEvent.ProgressChanged -> {
                                                         status = buildString {
                                                             append(event.snapshot.label)
                                                             event.snapshot.progressPercent?.let { append(" ($it%)") }
                                                         }
                                                     }
 
-                                                    is DownloadEvent.OutputResolved -> resultPath = event.path
-                                                    is DownloadEvent.Completed -> {
+                                                    is MediaEvent.OutputResolved -> resultPath = event.path
+                                                    is MediaEvent.Completed -> {
                                                         status = if (usedFallback) "Download complete via fallback" else "Download complete"
                                                         resultPath = event.outputPath
                                                     }
 
-                                                    is DownloadEvent.Failed -> {
+                                                    is MediaEvent.Failed -> {
                                                         error = event.message
                                                         status = "Download failed"
                                                     }

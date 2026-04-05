@@ -1,5 +1,5 @@
-public final class dev/lizz/ytdl/engine/youtube/JvmNativeYoutubeDownloaderFactory {
-	public static final field INSTANCE Ldev/lizz/ytdl/engine/youtube/JvmNativeYoutubeDownloaderFactory;
-	public final fun createDefault ()Ldev/lizz/ytdl/core/YoutubeDownloader;
+public final class dev/lizz/ytdl/providers/youtube/JvmYoutubeProviderFactory {
+	public static final field INSTANCE Ldev/lizz/ytdl/providers/youtube/JvmYoutubeProviderFactory;
+	public final fun createDefault ()Ldev/lizz/ytdl/core/MediaClient;
 }
 

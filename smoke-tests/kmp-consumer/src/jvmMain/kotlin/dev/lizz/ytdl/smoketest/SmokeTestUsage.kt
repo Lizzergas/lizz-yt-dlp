@@ -1,15 +1,15 @@
 package dev.lizz.ytdl.smoketest
 
-import dev.lizz.ytdl.core.DownloadOptions
-import dev.lizz.ytdl.core.DownloadRequest
-import dev.lizz.ytdl.engine.youtube.JvmNativeYoutubeDownloaderFactory
+import dev.lizz.ytdl.core.AudioDownloadOptions
+import dev.lizz.ytdl.core.AudioDownloadRequest
+import dev.lizz.ytdl.providers.youtube.JvmYoutubeProviderFactory
 
 @Suppress("unused")
-fun buildRequest(): Pair<DownloadRequest, Any> {
-    val downloader = JvmNativeYoutubeDownloaderFactory.createDefault()
-    val request = DownloadRequest(
+fun buildRequest(): Pair<AudioDownloadRequest, Any> {
+    val downloader = JvmYoutubeProviderFactory.createDefault()
+    val request = AudioDownloadRequest(
         url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        options = DownloadOptions(outputPath = "./downloads"),
+        options = AudioDownloadOptions(outputPath = "./downloads"),
     )
     return request to downloader
 }
