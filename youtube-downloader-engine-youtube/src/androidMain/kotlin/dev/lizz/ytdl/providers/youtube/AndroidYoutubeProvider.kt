@@ -1,25 +1,26 @@
 package dev.lizz.ytdl.providers.youtube
 
 import android.content.Context
-import dev.lizz.ytdl.core.MediaEvent
 import dev.lizz.ytdl.core.AudioDownloadOptions
 import dev.lizz.ytdl.core.AudioDownloadRequest
 import dev.lizz.ytdl.core.AudioDownloadResult
+import dev.lizz.ytdl.core.MediaEvent
+import dev.lizz.ytdl.core.MediaProvider
 import dev.lizz.ytdl.core.MediaStage
 import dev.lizz.ytdl.core.ProviderId
 import dev.lizz.ytdl.core.TranscriptRequest
 import dev.lizz.ytdl.core.TranscriptResult
 import dev.lizz.ytdl.core.TransferSnapshot
-import dev.lizz.ytdl.core.MediaProvider
 import dev.lizz.ytdl.providers.youtube.hls.HlsAudioSegments
-import dev.lizz.ytdl.providers.youtube.YoutubeProviderSupport
-import java.io.File
-import java.nio.charset.Charset
-import java.nio.charset.StandardCharsets
+import dev.lizz.ytdl.providers.youtube.net.YoutubeHttpResult
 import dev.lizz.ytdl.providers.youtube.perf.DOWNLOAD_BUFFER_SIZE_BYTES
 import dev.lizz.ytdl.providers.youtube.perf.HLS_DOWNLOAD_PARALLELISM
 import dev.lizz.ytdl.providers.youtube.perf.ProgressStepTracker
 import dev.lizz.ytdl.providers.youtube.perf.parallelMapBatched
+import dev.lizz.ytdl.providers.youtube.probe.YoutubeAudioPlanner
+import dev.lizz.ytdl.providers.youtube.probe.YoutubeProbeService
+import dev.lizz.ytdl.providers.youtube.probe.YoutubeProbeTransport
+import dev.lizz.ytdl.providers.youtube.probe.userAgentForSource
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -31,17 +32,18 @@ import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpMethod
 import io.ktor.utils.io.readAvailable
-import java.io.ByteArrayInputStream
-import java.net.URL
-import java.util.zip.GZIPInputStream
-import java.util.zip.InflaterInputStream
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.net.URL
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
+import java.util.zip.GZIPInputStream
+import java.util.zip.InflaterInputStream
+import kotlin.math.roundToInt
 
 internal class AndroidYoutubeProvider(
     private val context: Context,
@@ -57,6 +59,17 @@ internal class AndroidYoutubeProvider(
     },
 ) : MediaProvider {
     override val id: ProviderId = YoutubeProviderSupport.providerId
+    private val probeService = YoutubeProbeService(commons = commons)
+    private val probeTransport = object : YoutubeProbeTransport {
+        override suspend fun getText(url: String, headers: Map<String, String>): String =
+            this@AndroidYoutubeProvider.getText(url, headers)
+
+        override suspend fun postJson(
+            url: String,
+            headers: Map<String, String>,
+            body: JsonObject,
+        ): JsonObject = this@AndroidYoutubeProvider.postJson(url, headers, body)
+    }
 
     override fun canHandle(locator: String): Boolean = YoutubeProviderSupport.canHandle(locator)
 
@@ -64,56 +77,65 @@ internal class AndroidYoutubeProvider(
         request: AudioDownloadRequest,
         emit: suspend (MediaEvent) -> Unit,
     ): AudioDownloadResult = withContext(Dispatchers.IO) {
-        emit(MediaEvent.StageChanged(MediaStage.PrepareProvider, "Resolving YouTube watch page in native Kotlin Android engine"))
-
-        val watchPageHtml = getText(
-            request.url,
-            mapOf(
-                "User-Agent" to YoutubeExtractorCommons.BROWSER_USER_AGENT,
-                "Accept-Language" to "en-US,en;q=0.9",
-                "Accept-Encoding" to "gzip, deflate",
-            )
-        )
-
-        emit(MediaEvent.StageChanged(MediaStage.ProbeMetadata, "Parsing watch page and requesting Innertube player responses"))
-        val watchData = commons.parseWatchData(request.url, watchPageHtml)
-        val apiPlayers = callPlayerApis(watchData.videoId, watchData.ytcfg, emit)
-        val initialResolved = commons.resolveMedia(request.url, watchData.initialPlayerResponse, apiPlayers)
-        val resolved = attemptProtectedFormatResolution(initialResolved, watchData.playerUrl, emit)
+        val probe = probeService.probe(request.url, probeTransport, emit = emit)
+        val resolved = probe.resolvedMedia
+        val watchData = probe.watchData
         emit(MediaEvent.MetadataResolved(resolved.metadata))
 
         val stagingDirectory = File(context.cacheDir, "kt-ytdlp-native").apply { mkdirs() }
-        val selectedFormat = commons.pickBestAudioFormat(resolved.audioFormats)
-        val orderedFormats = (listOf(selectedFormat) + resolved.audioFormats.filterNot { it.url == selectedFormat.url })
-            .filter { it.url != null }
+        val audioPlan = YoutubeAudioPlanner.plan(
+            resolved,
+            manifestPriority = listOf("hls"),
+            preferredFormatPicker = commons::pickBestAudioFormat
+        )
+        audioPlan.preferredDirectFormat?.let { emit(MediaEvent.LogEmitted("Native engine selected ${it.describe()}")) }
 
-        emit(MediaEvent.LogEmitted("Native engine selected ${selectedFormat.describe()}"))
-
-        val workingFile = File(stagingDirectory, "audio.${selectedFormat.ext}")
         val outputFile = resolveOutputFile(request.options, resolved.metadata.title)
         emit(MediaEvent.OutputResolved(outputFile.absolutePath))
 
-        emit(MediaEvent.StageChanged(MediaStage.DownloadAudio, "Downloading direct audio stream resolved by native engine"))
-        val directDownloadSucceeded = runCatching {
-            val downloadedFormat = downloadFirstAvailableFormat(orderedFormats, workingFile, watchData.canonicalUrl, emit)
-            emit(MediaEvent.WorkingFileResolved(workingFile.absolutePath))
-            emit(MediaEvent.LogEmitted("Downloaded using ${downloadedFormat.describe()}"))
-
-            emit(MediaEvent.StageChanged(MediaStage.ConvertOutput, "Transcoding the downloaded audio stream into mp3"))
-            transcoder.transcodeFileToMp3(
-                inputFile = workingFile,
-                outputFile = outputFile,
-                durationSeconds = resolved.metadata.durationSeconds,
-                emit = emit,
-            )
-            true
-        }.getOrElse { error ->
-            emit(MediaEvent.LogEmitted("Direct media URLs were not usable: ${error.message}"))
+        val directDownloadSucceeded = if (audioPlan.preferredDirectFormat == null) {
             false
+        } else {
+            val workingFile = File(stagingDirectory, "audio.${audioPlan.preferredDirectFormat.ext}")
+            emit(
+                MediaEvent.StageChanged(
+                    MediaStage.DownloadAudio,
+                    "Downloading direct audio stream resolved by native engine"
+                )
+            )
+            runCatching {
+                val downloadedFormat = downloadFirstAvailableFormat(
+                    audioPlan.directFormats,
+                    workingFile,
+                    watchData.canonicalUrl,
+                    emit
+                )
+                emit(MediaEvent.WorkingFileResolved(workingFile.absolutePath))
+                emit(MediaEvent.LogEmitted("Downloaded using ${downloadedFormat.describe()}"))
+
+                emit(
+                    MediaEvent.StageChanged(
+                        MediaStage.ConvertOutput,
+                        "Transcoding the downloaded audio stream into mp3"
+                    )
+                )
+                transcoder.transcodeFileToMp3(
+                    inputFile = workingFile,
+                    outputFile = outputFile,
+                    durationSeconds = resolved.metadata.durationSeconds,
+                    emit = emit,
+                )
+                workingFile.delete()
+                true
+            }.getOrElse { error ->
+                emit(MediaEvent.LogEmitted("Direct media URLs were not usable: ${error.message}"))
+                workingFile.delete()
+                false
+            }
         }
 
         if (!directDownloadSucceeded) {
-            val manifest = resolved.hlsManifestUrls.firstOrNull()
+            val manifest = audioPlan.manifestFallbacks.firstOrNull()
                 ?: throw IllegalStateException("Direct download failed and no HLS manifest fallback was available")
             emit(MediaEvent.LogEmitted("Falling back to ${manifest.kind.uppercase()} manifest from ${manifest.source}"))
             val manifestHeaders = mapOf(
@@ -121,7 +143,8 @@ internal class AndroidYoutubeProvider(
                 "Origin" to "https://www.youtube.com",
                 "User-Agent" to userAgentForSource(manifest.source),
             )
-            val playableManifestUrl = selectAndroidPlayableManifestUrl(manifest.url, manifestHeaders, emit)
+            val playableManifestUrl =
+                selectAndroidPlayableManifestUrl(manifest.url, manifestHeaders, emit)
             emit(MediaEvent.LogEmitted("Android manifest URL: $playableManifestUrl"))
             val hlsWorkingFile = downloadHlsAudioToLocalFile(
                 manifestUrl = playableManifestUrl,
@@ -129,9 +152,19 @@ internal class AndroidYoutubeProvider(
                 stagingDirectory = stagingDirectory,
                 emit = emit,
             )
-            emit(MediaEvent.StageChanged(MediaStage.DownloadAudio, "Downloading HLS audio fragments locally"))
+            emit(
+                MediaEvent.StageChanged(
+                    MediaStage.DownloadAudio,
+                    "Downloading HLS audio fragments locally"
+                )
+            )
             emit(MediaEvent.WorkingFileResolved(hlsWorkingFile.absolutePath))
-            emit(MediaEvent.StageChanged(MediaStage.ConvertOutput, "Transcoding downloaded HLS audio into mp3"))
+            emit(
+                MediaEvent.StageChanged(
+                    MediaStage.ConvertOutput,
+                    "Transcoding downloaded HLS audio into mp3"
+                )
+            )
             transcoder.transcodeFileToMp3(
                 inputFile = hlsWorkingFile,
                 outputFile = outputFile,
@@ -142,8 +175,12 @@ internal class AndroidYoutubeProvider(
             emit(MediaEvent.LogEmitted("Android HLS local fragment transcode finished"))
         }
 
-        emit(MediaEvent.StageChanged(MediaStage.Finalize, "Cleaning temporary files and finalizing output"))
-        workingFile.delete()
+        emit(
+            MediaEvent.StageChanged(
+                MediaStage.Finalize,
+                "Cleaning temporary files and finalizing output"
+            )
+        )
         emit(MediaEvent.Completed(outputFile.absolutePath))
 
         AudioDownloadResult(
@@ -159,94 +196,25 @@ internal class AndroidYoutubeProvider(
         return YoutubeTranscriptFormatter.format(transcript, request.includeTimecodes)
     }
 
-    override suspend fun getTranscriptCues(request: TranscriptRequest): TranscriptResult? = withContext(Dispatchers.IO) {
-        if (!request.languageCode.startsWith("en", ignoreCase = true)) return@withContext null
-        val watchPageHtml = getText(
-            request.url,
-            mapOf(
-                "User-Agent" to YoutubeExtractorCommons.BROWSER_USER_AGENT,
-                "Accept-Language" to "en-US,en;q=0.9",
-                "Accept-Encoding" to "gzip, deflate",
-            )
-        )
-        val watchData = commons.parseWatchData(request.url, watchPageHtml)
-        val apiPlayers = callPlayerApis(watchData.videoId, watchData.ytcfg, emit = {})
-        val track = YoutubeTranscriptResolver.resolvePreferredTrack(watchData.initialPlayerResponse, apiPlayers, request.languageCode) ?: return@withContext null
-        val vttText = getText(
-            buildTranscriptVttUrl(track.baseUrl),
-            mapOf(
-                "User-Agent" to userAgentForSource(track.source),
-                "Accept-Language" to "en-US,en;q=0.9",
-                "Accept-Encoding" to "gzip, deflate",
-                "Origin" to "https://www.youtube.com",
-                "Referer" to watchData.canonicalUrl,
-            )
-        )
-        YoutubeWebVttParser.parse(vttText, track.languageCode, track.isAutoGenerated, track.source)
-    }
-
-    private suspend fun callPlayerApis(videoId: String, ytcfg: JsonObject, emit: suspend (MediaEvent) -> Unit): List<Pair<String, JsonObject>> {
-        val apiKey = ytcfg.string("INNERTUBE_API_KEY") ?: throw IllegalStateException("Watch page is missing INNERTUBE_API_KEY")
-        val clients = commons.createInnertubeClients(ytcfg)
-        val results = mutableListOf<Pair<String, JsonObject>>()
-
-        for (client in clients) {
-            try {
-                val player = postPlayerRequest(apiKey, videoId, client)
-                emit(MediaEvent.LogEmitted("${client.label} responded with ${summarize(player)}"))
-                results += client.label to player
-            } catch (e: Exception) {
-                emit(MediaEvent.LogEmitted("${client.label} unavailable: ${e.message}"))
-            }
+    override suspend fun getTranscriptCues(request: TranscriptRequest): TranscriptResult? =
+        withContext(Dispatchers.IO) {
+            val probe = probeService.probe(request.url, probeTransport, emit = {})
+            probeService.getTranscriptCues(probe, request, probeTransport)
         }
-        return results
-    }
 
-    private suspend fun postPlayerRequest(apiKey: String, videoId: String, client: PlayerClientConfig): JsonObject {
-        val body = buildJsonObject {
-            put("context", client.context)
-            put("videoId", videoId)
-            put("contentCheckOk", true)
-            put("racyCheckOk", true)
-        }.toString().toByteArray(StandardCharsets.UTF_8)
-
+    private suspend fun postJson(
+        url: String,
+        headers: Map<String, String>,
+        body: JsonObject,
+    ): JsonObject {
         val response = requestBytes(
-            url = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key=$apiKey",
+            url = url,
             method = HttpMethod.Post,
-            headers = buildMap {
-                put("Content-Type", "application/json")
-                put("User-Agent", client.userAgent)
-                put("X-YouTube-Client-Name", client.headerClientName)
-                put("X-YouTube-Client-Version", client.headerClientVersion)
-                put("Accept-Encoding", "gzip, deflate")
-                put("Origin", "https://www.youtube.com")
-                client.visitorData?.let { put("X-Goog-Visitor-Id", it) }
-            },
-            body = body,
+            headers = headers,
+            body = body.toString().toByteArray(StandardCharsets.UTF_8),
         )
         if (response.statusCode !in 200..299) throw IllegalStateException("HTTP ${response.statusCode}")
         return Json.parseToJsonElement(response.body.toString(StandardCharsets.UTF_8)) as JsonObject
-    }
-
-    private suspend fun attemptProtectedFormatResolution(
-        resolved: ResolvedYoutubeMedia,
-        playerUrl: String?,
-        emit: suspend (MediaEvent) -> Unit,
-    ): ResolvedYoutubeMedia {
-        if (resolved.audioFormats.all { it.url != null } || playerUrl == null) return resolved
-        emit(MediaEvent.LogEmitted("Protected audio formats detected; fetching player JS from $playerUrl"))
-        val directBefore = resolved.audioFormats.count { it.url != null }
-        val playerJs = getText(
-            playerUrl,
-            mapOf(
-                "User-Agent" to YoutubeExtractorCommons.BROWSER_USER_AGENT,
-                "Accept-Encoding" to "gzip, deflate",
-            )
-        )
-        val solvedFormats = PlayerJsDecipherer.resolveProtectedFormats(resolved.audioFormats, playerJs)
-        val directAfter = solvedFormats.count { it.url != null }
-        emit(MediaEvent.LogEmitted("Native signature solver resolved ${directAfter - directBefore} protected audio format(s)"))
-        return resolved.copy(audioFormats = solvedFormats)
     }
 
     private suspend fun downloadFirstAvailableFormat(
@@ -263,7 +231,9 @@ internal class AndroidYoutubeProvider(
                 format
             }.onSuccess { return it }
                 .onFailure { error ->
-                    lastError = error as? Exception ?: IllegalStateException(error.message ?: error.toString())
+                    lastError = error as? Exception ?: IllegalStateException(
+                        error.message ?: error.toString()
+                    )
                     emit(MediaEvent.LogEmitted("Format ${format.describe()} was rejected, trying fallback: ${error.message}"))
                 }
         }
@@ -344,7 +314,7 @@ internal class AndroidYoutubeProvider(
     private suspend fun getText(url: String, headers: Map<String, String>): String {
         val response = requestBytes(url, HttpMethod.Get, headers, null)
         if (response.statusCode !in 200..299) throw IllegalStateException("Watch page returned HTTP ${response.statusCode}")
-        return response.body.toString(response.charset)
+        return response.body.toString(charsetFromContentType(response.contentType))
     }
 
     private suspend fun selectAndroidPlayableManifestUrl(
@@ -386,7 +356,8 @@ internal class AndroidYoutubeProvider(
         emit: suspend (MediaEvent) -> Unit,
     ): File {
         val playlistText = getText(manifestUrl, headers)
-        val lines = playlistText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        val lines =
+            playlistText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
 
         val initSegment = lines.firstNotNullOfOrNull { line ->
             if (!line.startsWith("#EXT-X-MAP:")) return@firstNotNullOfOrNull null
@@ -401,8 +372,18 @@ internal class AndroidYoutubeProvider(
             throw IllegalStateException("Android HLS downloader found no media segments in playlist")
         }
 
-        val outputFile = File(stagingDirectory, if (initSegment != null) "audio-hls.mp4" else "audio-hls.aac")
-        emit(MediaEvent.LogEmitted("Android HLS downloader segments=${segmentUrls.size} parallelism=${minOf(HLS_DOWNLOAD_PARALLELISM, segmentUrls.size)}"))
+        val outputFile =
+            File(stagingDirectory, if (initSegment != null) "audio-hls.mp4" else "audio-hls.aac")
+        emit(
+            MediaEvent.LogEmitted(
+                "Android HLS downloader segments=${segmentUrls.size} parallelism=${
+                    minOf(
+                        HLS_DOWNLOAD_PARALLELISM,
+                        segmentUrls.size
+                    )
+                }"
+            )
+        )
         outputFile.parentFile?.mkdirs()
         var strippedId3Logged = false
         var totalWritten = 0L
@@ -420,7 +401,8 @@ internal class AndroidYoutubeProvider(
                     requestBytes(url, HttpMethod.Get, headers, null).body
                 }
                 downloadedBatch.forEach { originalBytes ->
-                    val bytes = if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
+                    val bytes =
+                        if (initSegment == null) HlsAudioSegments.stripLeadingId3Tags(originalBytes) else originalBytes
                     if (!strippedId3Logged && bytes.size != originalBytes.size) {
                         strippedId3Logged = true
                         emit(MediaEvent.LogEmitted("Android HLS downloader stripped leading ID3 metadata from AAC segments"))
@@ -428,7 +410,9 @@ internal class AndroidYoutubeProvider(
                     out.write(bytes)
                     totalWritten += bytes.size
                     completedSegments++
-                    val percent = (((completedSegments).toDouble() / segmentUrls.size) * 100).roundToInt().coerceIn(0, 100)
+                    val percent =
+                        (((completedSegments).toDouble() / segmentUrls.size) * 100).roundToInt()
+                            .coerceIn(0, 100)
                     if (completedSegments == 1 || completedSegments == segmentUrls.size || percent % 10 == 0) {
                         emit(MediaEvent.LogEmitted("Android HLS downloader progress: segment $completedSegments/${segmentUrls.size}"))
                     }
@@ -456,6 +440,7 @@ internal class AndroidYoutubeProvider(
                 val origin = URL(baseUrl).let { "${it.protocol}://${it.host}" }
                 "$origin$uri"
             }
+
             else -> {
                 val base = baseUrl.substringBeforeLast('/')
                 "$base/$uri"
@@ -496,16 +481,21 @@ internal class AndroidYoutubeProvider(
         return result
     }
 
-    private suspend fun requestBytes(url: String, method: HttpMethod, headers: Map<String, String>, body: ByteArray?): ByteResponse {
+    private suspend fun requestBytes(
+        url: String,
+        method: HttpMethod,
+        headers: Map<String, String>,
+        body: ByteArray?,
+    ): YoutubeHttpResult {
         val response = client.request(url) {
             this.method = method
             headers { headers.forEach { (key, value) -> append(key, value) } }
             body?.let { setBody(it) }
         }
-        return ByteResponse(
+        return YoutubeHttpResult(
             statusCode = response.status.value,
             body = decodeResponseBody(response.bodyAsBytes(), response.headers["Content-Encoding"]),
-            charset = charsetFromContentType(response.headers["Content-Type"]),
+            contentType = response.headers["Content-Type"],
         )
     }
 
@@ -524,18 +514,27 @@ internal class AndroidYoutubeProvider(
             ?.firstOrNull { it.startsWith("charset=", ignoreCase = true) }
             ?.substringAfter('=')
             ?.trim()
-        return charsetName?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: StandardCharsets.UTF_8
+        return charsetName?.let { runCatching { Charset.forName(it) }.getOrNull() }
+            ?: StandardCharsets.UTF_8
     }
 
     private fun resolveOutputFile(options: AudioDownloadOptions, title: String): File {
-        val safeTitle = title.replace(Regex("""[\\/:*?"<>|]"""), "_").replace(Regex("""\s+"""), " ").trim().take(120).ifBlank { "youtube-audio" }
+        val safeTitle =
+            title.replace(Regex("""[\\/:*?"<>|]"""), "_").replace(Regex("""\s+"""), " ").trim()
+                .take(120).ifBlank { "youtube-audio" }
         val defaultFileName = "$safeTitle.mp3"
         val outputTarget = options.outputPath
 
-        if (outputTarget.isNullOrBlank()) return uniqueFile(File(context.filesDir, defaultFileName).absoluteFile)
+        if (outputTarget.isNullOrBlank()) return uniqueFile(
+            File(
+                context.filesDir,
+                defaultFileName
+            ).absoluteFile
+        )
 
         val raw = File(outputTarget)
-        val looksLikeDirectory = outputTarget.endsWith("/") || outputTarget.endsWith("\\") || !raw.name.contains('.')
+        val looksLikeDirectory =
+            outputTarget.endsWith("/") || outputTarget.endsWith("\\") || !raw.name.contains('.')
         val resolved = when {
             raw.exists() && raw.isDirectory -> File(raw, defaultFileName)
             looksLikeDirectory -> File(raw, defaultFileName)
@@ -561,35 +560,4 @@ internal class AndroidYoutubeProvider(
         }
     }
 
-    private fun summarize(player: JsonObject): String {
-        val streamingData = player.objectAt("streamingData") ?: return "no streamingData"
-        val allFormats = buildList {
-            addAll(streamingData.array("formats"))
-            addAll(streamingData.array("adaptiveFormats"))
-        }
-        val direct = allFormats.count { (it as? JsonObject)?.string("url") != null }
-        val cipher = allFormats.count { (it as? JsonObject)?.string("signatureCipher") != null }
-        return "direct=$direct cipher=$cipher"
-    }
-
-    private fun userAgentForSource(source: String): String {
-        return when (source) {
-            "ios-player-api" -> YoutubeConstants.IOS_USER_AGENT
-            "tv-player-api" -> YoutubeConstants.TV_USER_AGENT
-            "android-player-api" -> YoutubeConstants.ANDROID_USER_AGENT
-            else -> YoutubeConstants.BROWSER_USER_AGENT
-        }
-    }
 }
-
-private data class ByteResponse(val statusCode: Int, val body: ByteArray, val charset: Charset)
-
-private fun JsonObject.string(key: String): String? = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull()?.takeIf { it.isNotBlank() }
-private fun JsonObject.array(key: String): List<kotlinx.serialization.json.JsonElement> = (this[key] as? kotlinx.serialization.json.JsonArray)?.toList().orEmpty()
-private fun JsonObject.objectAt(vararg path: String): JsonObject? {
-    var current: kotlinx.serialization.json.JsonElement = this
-    for (key in path) current = (current as? JsonObject)?.get(key) ?: return null
-    return current as? JsonObject
-}
-private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? = runCatching { content }.getOrNull()
-private fun NativeAudioFormat.describe(): String = listOfNotNull(ext, averageBitrate?.toInt()?.let { "$it kbps" }, audioCodec, source).joinToString(" | ")

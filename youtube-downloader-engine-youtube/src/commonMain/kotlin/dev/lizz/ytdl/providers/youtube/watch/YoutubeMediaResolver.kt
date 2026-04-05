@@ -1,6 +1,7 @@
 package dev.lizz.ytdl.providers.youtube
 
 import dev.lizz.ytdl.core.MediaMetadata
+import dev.lizz.ytdl.providers.youtube.errors.NoAudioCandidatesFailure
 import kotlinx.serialization.json.JsonObject
 
 internal object YoutubeMediaResolver {
@@ -27,9 +28,7 @@ internal object YoutubeMediaResolver {
         }.distinctBy { it.url }
 
         if (formats.none { it.url != null } && manifests.isEmpty()) {
-            throw IllegalStateException(
-                "Native engine could not find any direct audio URLs or manifests. This video likely requires signature or n-parameter solving that is not implemented yet."
-            )
+            throw NoAudioCandidatesFailure()
         }
 
         val title = listOfNotNull(
